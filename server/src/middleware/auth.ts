@@ -27,6 +27,7 @@ import type { BetterAuthSessionResult } from "../auth/better-auth.js";
 import { logger } from "./logger.js";
 import { captureRunIdentity } from "../services/run-identity.js";
 import { boardAuthService } from "../services/board-auth.js";
+import { forkAgentPortNext } from "../fork-agent-port.js";
 import { retryIdempotentDatabaseOperation } from "../database-retry.js";
 import { beginIdleTrackedWork } from "../services/task-admission.js";
 
@@ -228,6 +229,7 @@ const publicMcpGatewayProtocolPath = /^\/mcp\/gateways\/gw_[a-f0-9]{32}\/?$/i;
 export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHandler {
   const boardAuth = boardAuthService(db);
   const authenticate: RequestHandler = async (req, _res, next) => {
+    next = forkAgentPortNext(req, _res, next);
     req.actor =
       opts.deploymentMode === "local_trusted"
         ? {

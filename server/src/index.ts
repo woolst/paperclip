@@ -33,6 +33,7 @@ import { pathToFileURL } from "node:url";
 import type { Request as ExpressRequest, RequestHandler } from "express";
 import { warnIfUnsupportedNodeVersion } from "@paperclipai/shared/node-version";
 import { and, eq } from "drizzle-orm";
+import { startForkAgentPort } from "./fork-agent-port.js";
 import {
   createDb,
   ensurePostgresDatabase,
@@ -1024,6 +1025,7 @@ async function startServerWithDatabaseTeardown(
     });
   });
   startupListenerBound = true;
+  startForkAgentPort(app, server);
 
   try {
     const result = await workspaceOperationService(db as any)
