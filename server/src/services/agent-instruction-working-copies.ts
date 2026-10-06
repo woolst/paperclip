@@ -145,6 +145,7 @@ export function agentInstructionWorkingCopyService(db: Db, options: { environmen
     const [agent] = await db.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.companyId, input.companyId)));
     if (!agent) throw notFound("Agent not found");
     if (agentInstructionsBundleMode(agent) !== "managed") return null;
+    if (input.target?.kind === "remote" && input.target.transport === "ssh" && agent.adapterConfig.mountedBox === true) return null;
     const bound = await resolveInstructionActor(db, { type: "agent", companyId: input.companyId, agentId: input.agentId, runId: input.runId });
     const baseline = existing?.baseRevisionId && !refreshStoppedCopy
       ? await revisions.readRevision({ companyId: input.companyId, agentId: input.agentId, entryFile: existing.entryFile, revisionId: existing.baseRevisionId }, bound).catch(async (error) => {
