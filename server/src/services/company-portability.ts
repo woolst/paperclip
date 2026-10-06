@@ -114,6 +114,7 @@ import {
 } from "./native-runtime/provider-profile.js";
 import { managedAgentProfileService } from "./managed-agent-profiles.js";
 import { remoteAgentProfileService } from "./remote-agent-profiles.js";
+import { keepForkFalseKeys } from "./fork-portable-keys.js";
 
 const EXPORT_READ_CONCURRENCY = 8;
 const EXPORT_ISSUE_READ_CONCURRENCY = 2;
@@ -4230,6 +4231,7 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
             defaultRules: adapterDefaultRules,
           },
         ) as Record<string, unknown>;
+        keepForkFalseKeys(agent.adapterConfig, portableAdapterConfig);
         const portableRuntimeConfig = pruneDefaultLikeValue(
           normalizePortableConfig(agent.runtimeConfig),
           {
