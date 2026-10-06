@@ -101,6 +101,7 @@ import {
   createClaudeAcpExecutor,
   resolveClaudeExecutionEngineForRun,
 } from "./acp.js";
+import { forkRefuseRun, forkRunEffort, forkRunRefusal, forkSettingsArgs } from "./fork-run-args.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const executeClaudeAcp = createClaudeAcpExecutor();
@@ -348,6 +349,7 @@ async function buildClaudeRuntimeConfig(input: ClaudeExecutionInput): Promise<Cl
     if (fromExtraArgs.length > 0) return fromExtraArgs;
     return asStringArray(config.args);
   })();
+  extraArgs.unshift(...forkSettingsArgs(config, executionTargetIsRemote ? env : runtimeEnv));
 
   return {
     command,
@@ -416,6 +418,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       },
     };
   }
+  if (forkRunRefusal(ctx.config, engineSelection.engine)) return forkRefuseRun(ctx, engineSelection.engine);
   if (engineSelection.engine === "acp") {
     return executeClaudeAcp(ctx);
   }
@@ -748,6 +751,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     }
   }
   let effectiveEffort = effort;
+  effectiveEffort = await forkRunEffort(effectiveEffort, model, onLog);
   if (executionTargetIsSandbox && effort) {
     const supportsEffort = await claudeCommandSupportsEffortFlag({
       runId,

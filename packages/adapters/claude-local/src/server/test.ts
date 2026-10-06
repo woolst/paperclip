@@ -43,6 +43,7 @@ import {
   logSandboxProbeDiagnostic,
 } from "./probe-diagnostics.js";
 import { buildLocalAdapterTestProbeEnv } from "./probe-env.js";
+import { forkSettingsText } from "./fork-run-args.js";
 
 function summarizeStatus(checks: AdapterEnvironmentCheck[]): AdapterEnvironmentTestResult["status"] {
   if (checks.some((check) => check.level === "error")) return "fail";
@@ -368,6 +369,7 @@ export async function testEnvironment(
       }
       if (effectiveEffort) args.push("--effort", effectiveEffort);
       if (maxTurns > 0) args.push("--max-turns", String(maxTurns));
+      args.push("--settings", forkSettingsText(config, model));
       if (extraArgs.length > 0) args.push(...extraArgs);
 
       // Sandbox bridges still add lease warmup and transport overhead, but
