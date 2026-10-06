@@ -114,10 +114,11 @@ export function mergeComposerRunSettings(
   delete config.modelReasoningEffort;
   delete config.reasoningEffort;
   delete config.effort;
-  delete config.thinking;
+  if (adapterType === "pi_local") delete config.thinking;
   delete config.variant;
   delete config.fastMode;
   if (settings.model) config.model = settings.model;
+  if (adapterType === "claude_local" && settings.model?.startsWith("claude-haiku-4-5")) delete config.ultracode;
   const effortKey = composerEffortKey(adapterType);
   if (settings.effort && effortKey) config[effortKey] = settings.effort;
   if (settings.fast && adapterType === "codex_local") config.fastMode = true;

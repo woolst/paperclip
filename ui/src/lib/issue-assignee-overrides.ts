@@ -12,6 +12,7 @@ export interface BuildAssigneeAdapterOverridesInput {
   modelOverride: string;
   thinkingEffortOverride: string;
   chrome: boolean;
+  runSwitches?: { ultracode?: boolean; thinking?: boolean };
 }
 
 /**
@@ -48,6 +49,8 @@ export function buildAssigneeAdapterOverrides(
   if (adapterType === "claude_local" && input.chrome) {
     adapterConfig.chrome = true;
   }
+  if (adapterType === "claude_local" && input.runSwitches?.ultracode) adapterConfig.ultracode = true;
+  if (adapterType === "claude_local" && input.runSwitches?.thinking) adapterConfig.thinking = true;
 
   if (Object.keys(adapterConfig).length === 0) return null;
   return { adapterConfig };

@@ -112,6 +112,7 @@ import {
   thinkingEffortValueFor,
   toDateTimeLocalValue,
 } from "./helpers";
+import { RunSwitches, claudeConfigForModel, runSwitchWords } from "./RunSwitches";
 import { PropertyPicker } from "./property-picker";
 import { PropertyChip, PropertyRow, PropertySection } from "./primitives";
 import {
@@ -734,7 +735,7 @@ export function IssueProperties({
     : null;
   const assigneeAdapterType = assignee?.adapterType ?? null;
   const assigneeAdapterOverrides = issue.assigneeAdapterOverrides ?? null;
-  const showAssigneeAdapterOptions = assigneeAdapterOverrides !== null;
+  const showAssigneeAdapterOptions = assigneeAdapterOverrides !== null || assigneeAdapterType === "claude_local";
   const supportsAssigneeOverrides = Boolean(
     assigneeAdapterType && ISSUE_OVERRIDE_ADAPTER_TYPES.has(assigneeAdapterType),
   );
@@ -809,7 +810,7 @@ export function IssueProperties({
   };
   const updateAssigneeOverrideModel = (nextModel: string) => {
     const nextConfig: Record<string, unknown> = {
-      ...assigneeOverrideAdapterConfig,
+      ...claudeConfigForModel(assigneeAdapterType, assigneeOverrideAdapterConfig, nextModel || assigneePrimaryModel),
       model: nextModel || undefined,
     };
     if (
@@ -838,6 +839,7 @@ export function IssueProperties({
         assigneeOverrideModel,
         assigneeOverrideThinkingEffort,
         assigneeOverrideChrome ? "Chrome" : "",
+        ...runSwitchWords(assigneeAdapterType, assigneeOverrideAdapterConfig),
       ].filter(Boolean);
       const summary = details.length > 0 ? `Override · ${details.join(" · ")}` : "Override · adapter options";
       return (
@@ -896,6 +898,7 @@ export function IssueProperties({
           <div className="space-y-1.5">
             <div className="text-xs text-muted-foreground">Thinking effort</div>
             <div className="flex items-center gap-1.5 flex-wrap">
+              <RunSwitches part="thinking" adapterType={assigneeAdapterType} model={effectiveAssigneeModel} values={assigneeOverrideAdapterConfig} onChange={updateAssigneeOverrideConfig} />
               {thinkingEffortOptionsFor(assigneeAdapterType, effectiveAssigneeModel).map((option) => (
                 <button
                   key={option.value || "default"}
@@ -919,6 +922,7 @@ export function IssueProperties({
               />
             </div>
           ) : null}
+          <RunSwitches part="ultracode" adapterType={assigneeAdapterType} model={effectiveAssigneeModel} values={assigneeOverrideAdapterConfig} onChange={updateAssigneeOverrideConfig} />
         </>
       ) : null}
     </div>

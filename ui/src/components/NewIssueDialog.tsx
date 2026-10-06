@@ -131,6 +131,7 @@ interface IssueDraft {
   assigneeModelOverride: string;
   assigneeThinkingEffort: string;
   assigneeChrome: boolean;
+  assigneeRunSwitches?: RunSwitchValues;
   executionWorkspaceMode?: string;
   selectedExecutionWorkspaceId?: string;
   useIsolatedExecutionWorkspace?: boolean;
@@ -148,6 +149,7 @@ type StagedIssueFile = {
 
 import { Badge } from "@/components/ui/badge";
 import { buildAssigneeAdapterOverrides, type IssueModelLane } from "../lib/issue-assignee-overrides";
+import { RunSwitches, claudeConfigForModel, runSwitchesOn, type RunSwitchValues } from "./issue-properties/RunSwitches";
 
 function loadDraft(): IssueDraft | null {
   try {
@@ -304,6 +306,7 @@ export function NewIssueDialog() {
   const [assigneeModelOverride, setAssigneeModelOverride] = useState("");
   const [assigneeThinkingEffort, setAssigneeThinkingEffort] = useState("");
   const [assigneeChrome, setAssigneeChrome] = useState(false);
+  const [assigneeRunSwitches, setAssigneeRunSwitches] = useState<RunSwitchValues>({});
   const [executionWorkspaceMode, setExecutionWorkspaceMode] = useState<string>("shared_workspace");
   const [selectedExecutionWorkspaceId, setSelectedExecutionWorkspaceId] = useState("");
   const [workMode, setWorkMode] = useState<IssueWorkMode>("standard");
@@ -530,6 +533,7 @@ export function NewIssueDialog() {
         assigneeModelOverride,
         assigneeThinkingEffort,
         assigneeChrome,
+        assigneeRunSwitches,
         executionWorkspaceMode,
         selectedExecutionWorkspaceId,
         workMode,
@@ -552,6 +556,7 @@ export function NewIssueDialog() {
       assigneeModelOverride,
       assigneeThinkingEffort,
       assigneeChrome,
+      assigneeRunSwitches,
       executionWorkspaceMode,
       selectedExecutionWorkspaceId,
       workMode,
@@ -588,6 +593,7 @@ export function NewIssueDialog() {
     assigneeModelOverride,
     assigneeThinkingEffort,
     assigneeChrome,
+    assigneeRunSwitches,
     executionWorkspaceMode,
     selectedExecutionWorkspaceId,
     workMode,
@@ -636,6 +642,7 @@ export function NewIssueDialog() {
       setAssigneeModelOverride("");
       setAssigneeThinkingEffort("");
       setAssigneeChrome(false);
+      setAssigneeRunSwitches({});
       setExecutionWorkspaceMode(defaultExecutionWorkspaceMode);
       setWorkMode(nextWorkMode);
       setSelectedExecutionWorkspaceId(newIssueDefaults.executionWorkspaceId ?? "");
@@ -661,6 +668,7 @@ export function NewIssueDialog() {
       setAssigneeModelOverride("");
       setAssigneeThinkingEffort("");
       setAssigneeChrome(false);
+      setAssigneeRunSwitches({});
       setExecutionWorkspaceMode(defaultExecutionWorkspaceModeForIssueDefaults(newIssueDefaults, defaultProject));
       setWorkMode(nextWorkMode);
       setSelectedExecutionWorkspaceId(newIssueDefaults.executionWorkspaceId ?? "");
@@ -703,6 +711,7 @@ export function NewIssueDialog() {
       setAssigneeModelOverride(draft.assigneeModelOverride ?? "");
       setAssigneeThinkingEffort(draft.assigneeThinkingEffort ?? "");
       setAssigneeChrome(draft.assigneeChrome ?? false);
+      setAssigneeRunSwitches(draft.assigneeRunSwitches ?? {});
       setExecutionWorkspaceMode(
         hasExplicitExecutionWorkspaceId || hasExplicitExecutionWorkspaceMode
           ? defaultExecutionWorkspaceModeForIssueDefaults(newIssueDefaults, restoredProject)
@@ -741,6 +750,7 @@ export function NewIssueDialog() {
       setAssigneeModelOverride("");
       setAssigneeThinkingEffort("");
       setAssigneeChrome(false);
+      setAssigneeRunSwitches({});
       setExecutionWorkspaceMode(defaultExecutionWorkspaceModeForIssueDefaults(newIssueDefaults, defaultProject));
       setSelectedExecutionWorkspaceId(newIssueDefaults.executionWorkspaceId ?? "");
       executionWorkspaceDefaultProjectId.current =
@@ -775,6 +785,7 @@ export function NewIssueDialog() {
     setAssigneeModelOverride("");
     setAssigneeThinkingEffort("");
     setAssigneeChrome(false);
+    setAssigneeRunSwitches({});
     setExecutionWorkspaceMode("shared_workspace");
     setSelectedExecutionWorkspaceId("");
     setWorkMode("standard");
@@ -795,10 +806,11 @@ export function NewIssueDialog() {
     if (!effectiveCompanyId || (!currentTitle && !currentDescription) || createIssue.isPending || worktreeSelectionIncomplete || parentPrivacyUnresolved) return;
     const inheritedOverrides = buildAssigneeAdapterOverrides({
       adapterType: assigneeAdapterType,
-      lane: assigneeChrome ? "custom" : assigneeModelLane,
+      lane: assigneeChrome || runSwitchesOn(assigneeRunSwitches) ? "custom" : assigneeModelLane,
       modelOverride: assigneeModelOverride,
       thinkingEffortOverride: assigneeThinkingEffort,
       chrome: assigneeChrome,
+      runSwitches: claudeConfigForModel(assigneeAdapterType, assigneeRunSwitches, assigneeRunModel),
     });
     const selectedProject = orderedProjects.find((project) => project.id === projectId);
     // Hidden selectors must not submit a restored draft over the managed default.
@@ -1094,12 +1106,14 @@ export function NewIssueDialog() {
   }, [visualViewportLayout]);
 
   const modelAgents = useMemo(() => new Map((agents ?? []).map((agent) => [agent.id, agent])), [agents]);
+  const assigneeRunModel = composerSettings?.model || assigneeModelOverride || modelAgents.get(parseAssigneeValue(assigneeValue).assigneeAgentId ?? "")?.adapterConfig?.model;
   const inheritedOverrides = buildAssigneeAdapterOverrides({
     adapterType: assigneeAdapterType,
-    lane: assigneeChrome ? "custom" : assigneeModelLane,
+    lane: assigneeChrome || runSwitchesOn(assigneeRunSwitches) ? "custom" : assigneeModelLane,
     modelOverride: assigneeModelOverride,
     thinkingEffortOverride: assigneeThinkingEffort,
     chrome: assigneeChrome,
+    runSwitches: claudeConfigForModel(assigneeAdapterType, assigneeRunSwitches, assigneeRunModel),
   });
 
   return (
@@ -1177,6 +1191,7 @@ export function NewIssueDialog() {
                 setAssigneeModelOverride("");
                 setAssigneeThinkingEffort("");
                 setAssigneeChrome(false);
+                setAssigneeRunSwitches({});
                 if (value && status === "backlog") setStatus("todo");
               }}
               creation={{
@@ -1382,6 +1397,7 @@ export function NewIssueDialog() {
                 submitDisabled: worktreeSelectionIncomplete || parentPrivacyUnresolved,
                 contextBar: (
                   <>
+                    <RunSwitches part="both" compact adapterType={assigneeAdapterType} model={assigneeRunModel} values={assigneeRunSwitches} onChange={(patch) => setAssigneeRunSwitches((current) => ({ ...current, ...patch }))} />
                     <InlineEntitySelector
                       value={projectId}
                       options={projectOptions}
