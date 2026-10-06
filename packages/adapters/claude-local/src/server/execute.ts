@@ -102,6 +102,7 @@ import {
   resolveClaudeExecutionEngineForRun,
 } from "./acp.js";
 import { forkRefuseRun, forkRunEffort, forkRunRefusal, forkSettingsArgs } from "./fork-run-args.js";
+import { forkMountedBox } from "./mounted-box.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const executeClaudeAcp = createClaudeAcpExecutor();
@@ -608,6 +609,8 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       `[paperclip] Confining Claude with ${scopes} scope.\n`,
     );
   }
+  const box = await forkMountedBox({ ctx, target: executionTarget, cwd, command, env, extraArgs, model, effort, promptBundle, servers: runtimeMcpServers });
+  if (box && "exitCode" in box) return box;
   const useManagedRemoteClaudeConfig =
     executionTargetIsRemote &&
     adapterExecutionTargetUsesManagedHome(executionTarget) &&
@@ -615,7 +618,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const claudeConfigSeedDir = useManagedRemoteClaudeConfig
     ? config.managedAiConnection ? sharedClaudeConfigDir : await prepareClaudeConfigSeed(process.env, onLog, agent.companyId)
     : null;
-  const preparedExecutionTargetRuntime = executionTargetIsRemote
+  const preparedExecutionTargetRuntime = box ? box.plan : executionTargetIsRemote
     ? await (async () => {
         await onLog(
           "stdout",
@@ -673,6 +676,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     executionTargetIsRemote,
     executionCwd: effectiveExecutionCwd,
   });
+  if (box) box.applyEnv(env, loggedEnv);
   const restoreRemoteWorkspace = preparedExecutionTargetRuntime
     ? () => preparedExecutionTargetRuntime.restoreWorkspace((line) => onLog("stdout", line))
     : null;
@@ -725,7 +729,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     });
   }
   let paperclipBridge: Awaited<ReturnType<typeof startAdapterExecutionTargetPaperclipBridge>> = null;
-  if (executionTargetIsRemote && adapterExecutionTargetUsesPaperclipBridge(runtimeExecutionTarget)) {
+  if (!box && executionTargetIsRemote && adapterExecutionTargetUsesPaperclipBridge(runtimeExecutionTarget)) {
     paperclipBridge = await startAdapterExecutionTargetPaperclipBridge({
       runId,
       target: runtimeExecutionTarget,
@@ -881,6 +885,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     if (runtimeMcpServers.length > 0) {
       args.push("--mcp-config", effectiveMcpConfigPath, "--strict-mcp-config");
     }
+    if (box?.mcpText) args[args.indexOf("--mcp-config") + 1] = box.mcpText;
     args.push("--add-dir", effectivePromptBundleAddDir);
     if (extraArgs.length > 0) args.push(...extraArgs);
     return args;
@@ -918,7 +923,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       : renderTemplate(promptTemplate, templateData);
     const sessionHandoffNote = asString(context.paperclipSessionHandoffMarkdown, "").trim();
     const prompt = joinPromptSections([
-      instructionsPathDirective,
+      box ? box.mapText(instructionsPathDirective) : instructionsPathDirective,
       renderedBootstrapPrompt,
       selectInitialCommunicationGuidance(context, { resumedSession: Boolean(resumeSessionId) }),
       wakePrompt,
