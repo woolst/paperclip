@@ -9,6 +9,8 @@
 // - thinking (boolean, optional): read only on FORK_THINKING_MODELS, sent there as
 //   "alwaysThinkingEnabled", absent as false. On every other model it is not read and not refused.
 // - autoMemory (false, optional): false sends "autoMemoryEnabled": false; absent sends nothing.
+// - pluginDirs (list, optional): one `--plugin-dir` per item after the `--settings` pair, so before
+//   the agent's extra arguments; its items and refusals are in fork-plugin-dirs.ts (fork commit 8).
 //
 // Refused before any process starts, with error code fork_run_refused:
 // - any of FORK_CLI_ONLY_KEYS set while the engine is not "cli" (no engine means ACP);
@@ -22,6 +24,7 @@
 import type { AdapterExecutionContext, AdapterExecutionResult } from "@paperclipai/adapter-utils";
 import { asStringArray } from "@paperclipai/adapter-utils/server-utils";
 import { claudeLocalReasoningEffortsForModel, resolveClaudeModel } from "../index.js";
+import { forkPluginDirArgs, forkPluginDirs } from "./fork-plugin-dirs.js";
 
 export const FORK_RUN_REFUSED = "fork_run_refused";
 
@@ -102,7 +105,7 @@ export function forkRunRefusal(
     const known = FORK_NO_ULTRACODE_MODELS.find((model) => sameModel(id, model));
     if (known) return `Ultracode is not allowed on ${known}.`;
   }
-  return null;
+  return forkPluginDirs(config).refusal;
 }
 
 /** Ends a refused run: one run-log line, then the result in the shape of adapter_engine_unavailable. */
@@ -132,12 +135,12 @@ export function forkSettingsText(config: Record<string, unknown>, model: string)
   return JSON.stringify(settings);
 }
 
-/** The `--settings` pair; the model is resolved as the run resolves it. */
+/** The `--settings` pair, then the `--plugin-dir` flags; the model is resolved as the run resolves it. */
 export function forkSettingsArgs(
   config: Record<string, unknown>,
   env: Record<string, unknown> = {},
 ): string[] {
-  return ["--settings", forkSettingsText(config, resolveClaudeModel(config.model, env))];
+  return ["--settings", forkSettingsText(config, resolveClaudeModel(config.model, env)), ...forkPluginDirArgs(config)];
 }
 
 /** The effort to send on this model, and the run-log line when a set effort is left out. */
