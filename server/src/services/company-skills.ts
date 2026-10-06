@@ -9,6 +9,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { skillFileBytes, snapshotFile, assertSkillSnapshotPath, skillSnapshotHash } from "./skill-snapshot.js";
+import { isPaperclipSkillsRoot } from "./bundled-skills-root.js";
 import { fileURLToPath } from "node:url";
 import { and, asc, desc, eq, inArray, isNull, isNotNull, lt, sql } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
@@ -3028,6 +3029,7 @@ export function companySkillService(db: Db, options: { actor?: AuthorizationActo
     for (const skillsRoot of resolveBundledSkillsRoot()) {
       const stats = await fs.stat(skillsRoot).catch(() => null);
       if (!stats?.isDirectory()) continue;
+      if (!isPaperclipSkillsRoot(skillsRoot)) continue;
       const bundledSkills = await readLocalSkillImports(companyId, skillsRoot)
         .then((skills) => skills.map((skill) => ({
           ...skill,
