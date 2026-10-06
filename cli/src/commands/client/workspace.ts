@@ -7,6 +7,7 @@ import {
   resolveCommandContext,
   type BaseClientOptions,
 } from "./common.js";
+import { registerEnvironmentBind } from "./environment-bind.js";
 
 interface CompanyOptions extends BaseClientOptions {
   companyId?: string;
@@ -65,6 +66,7 @@ export function registerWorkspaceCommands(program: Command): void {
   addDelete(environment, "delete", "Delete an environment", "environments");
   addPostEmpty(environment, "probe", "Probe an environment", "environments", "probe");
   addCompanyPostJson(environment, "probe-config", "Probe an environment config", "environments/probe-config");
+  registerEnvironmentBind(environment);
 
   const projectWorkspace = program.command("project-workspace").description("Project workspace operations");
   addCommonClientOptions(
