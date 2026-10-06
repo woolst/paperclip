@@ -1,0 +1,144 @@
+{
+  "upstream": {
+    "remote": "upstream",
+    "branch": "master"
+  },
+  "commits": [
+    {
+      "subject": "fork(tools): rebase guard",
+      "files": {},
+      "tests": [
+        "fork/test_rebase_guard.py"
+      ]
+    },
+    {
+      "subject": "fork(skills): take a bundled-skills folder only if it holds Paperclip's core skill",
+      "files": {
+        "server/src/services/company-skills.ts": 2,
+        "server/src/routes/access.ts": 3
+      },
+      "tests": [
+        "server/src/services/bundled-skills-root.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(server): test that the import keeps the fork's adapter keys",
+      "files": {
+        "server/src/services/company-portability.ts": 2
+      },
+      "tests": [
+        "server/src/__tests__/fork-adapter-keys-import.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(claude): ultracode and thinking switches",
+      "files": {
+        "packages/adapters/claude-local/src/server/execute.ts": 4,
+        "packages/adapters/claude-local/src/server/test.ts": 2
+      },
+      "tests": [
+        "packages/adapters/claude-local/src/server/fork-run-args.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(cli): bind agents to their environments",
+      "files": {
+        "cli/src/commands/client/workspace.ts": 2
+      },
+      "tests": [
+        "cli/src/__tests__/environment-bind.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(claude): run in a mounted box folder without copying files",
+      "files": {
+        "packages/adapters/claude-local/src/server/execute.ts": 8
+      },
+      "tests": [
+        "packages/adapters/claude-local/src/server/mounted-box.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(server): bind run settings",
+      "files": {
+        "server/src/routes/issues.ts": 8,
+        "server/src/routes/agents.ts": 3,
+        "server/src/routes/workspace-command-authz.ts": 3
+      },
+      "tests": [
+        "server/src/routes/run-settings-authz.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(claude): plugin folders",
+      "files": {},
+      "tests": [
+        "packages/adapters/claude-local/src/server/fork-plugin-dirs.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(server): no agent-folder copy for a box run",
+      "files": {
+        "server/src/services/agent-directory-working-copies.ts": 1,
+        "server/src/services/agent-instruction-working-copies.ts": 1
+      },
+      "tests": [
+        "server/src/services/agent-directory-working-copies.fork.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(server): agent port for the boxes",
+      "files": {
+        "server/src/index.ts": 2,
+        "server/src/middleware/auth.ts": 2
+      },
+      "tests": [
+        "server/src/fork-agent-port.test.ts"
+      ]
+    },
+    {
+      "subject": "fork(ui): run switches on the task card",
+      "files": {
+        "ui/src/components/issue-properties/IssueProperties.tsx": 6,
+        "ui/src/components/issue-properties/helpers.ts": 4,
+        "ui/src/lib/issue-assignee-overrides.ts": 3,
+        "ui/src/components/NewIssueDialog.tsx": 18,
+        "ui/src/components/task-chat/composer-run-settings.ts": 2
+      },
+      "tests": [
+        "ui/src/components/issue-properties/RunSwitches.test.tsx"
+      ]
+    }
+  ],
+  "sshCopyCalls": [
+    "syncDirectoryToSsh",
+    "prepareAdapterExecutionTargetRuntime",
+    "materializeRemoteClaudeConfig",
+    "startAdapterExecutionTargetPaperclipBridge",
+    "restoreWorkspaceFromSshExecution"
+  ],
+  "sshCopyCallers": [
+    "server/src/services/agent-instruction-working-copies.ts",
+    "server/src/services/agent-file-checkpoints.ts",
+    "server/src/services/agent-directory-working-copies.ts",
+    "server/src/services/native-runtime/native-workspace-sync.ts",
+    "packages/adapters/opencode-local/src/server/execute.ts",
+    "packages/adapters/opencode-local/src/server/test.ts",
+    "packages/adapters/cursor-local/src/server/execute.ts",
+    "packages/adapters/kimi-local/src/server/execute.ts",
+    "packages/adapters/gemini-local/src/server/execute.ts",
+    "packages/adapters/grok-local/src/server/execute.ts",
+    "packages/adapters/grok-local/src/server/test.ts",
+    "packages/adapters/claude-local/src/server/claude-config.ts",
+    "packages/adapters/claude-local/src/server/execute.ts",
+    "packages/adapters/claude-local/src/server/acp.ts",
+    "packages/adapters/codex-local/src/server/test.ts",
+    "packages/adapters/codex-local/src/server/execute.ts",
+    "packages/adapters/pi-local/src/server/execute.ts",
+    "packages/adapter-utils/src/ssh.ts",
+    "packages/adapter-utils/src/remote-managed-runtime.ts",
+    "packages/adapter-utils/src/execution-target.ts",
+    "packages/adapter-utils/src/acpx-engine/execute.ts"
+  ],
+  "issueWorkspaceChecks": 4
+}
