@@ -252,6 +252,7 @@ import {
   assertNoAgentHostWorkspaceCommandMutation,
   collectIssueWorkspaceCommandPaths,
 } from "./workspace-command-authz.js";
+import { assertRunServesTask, assertTriageRecordWrite, bindRunSettings } from "./run-settings-authz.js";
 import { shouldWakeAssigneeOnCheckout } from "./issues-checkout-wakeup.js";
 import {
   formatAttachmentSize,
@@ -10666,6 +10667,7 @@ export function issueRoutes(
         "Issue not found",
       );
       if (!issue) return;
+      assertTriageRecordWrite(req, issue);
       if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
       if (
         !(await assertDeliverableMutationAllowedByRunContext(req, res, issue))
@@ -10977,6 +10979,7 @@ export function issueRoutes(
         "Issue not found",
       );
       if (!issue) return;
+      assertTriageRecordWrite(req, issue);
       if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
       if (
         !(await assertDeliverableMutationAllowedByRunContext(req, res, issue))
@@ -12140,6 +12143,7 @@ export function issueRoutes(
         req,
         collectIssueWorkspaceCommandPaths(req.body),
       );
+      await bindRunSettings(db, req, { body: req.body });
       const sanitizedBody = await sanitizeIssueCreateAttribution(
         db,
         req,
@@ -12677,6 +12681,7 @@ export function issueRoutes(
         req,
         collectIssueWorkspaceCommandPaths(req.body),
       );
+      await bindRunSettings(db, req, { body: req.body });
       const sanitizedBody = await sanitizeIssueCreateAttribution(
         db,
         req,
@@ -12951,6 +12956,7 @@ export function issueRoutes(
           req,
           collectIssueWorkspaceCommandPaths(childBody),
         );
+        await bindRunSettings(db, req, { body: childBody });
         if (childBody.assigneeAgentId || childBody.assigneeUserId) {
           await assertCanAssignTasks(req, sourceIssue.companyId, {
             projectId: childBody.projectId ?? sourceIssue.projectId ?? null,
@@ -13567,6 +13573,7 @@ export function issueRoutes(
         req,
         collectIssueWorkspaceCommandPaths(req.body),
       );
+      await bindRunSettings(db, req, { body: req.body, existing });
 
       if (req.actor.type === "agent" && req.body.onBehalfOfUserId != null) {
         await auditAgentIssueCommentAttributionSpoof({
@@ -15858,6 +15865,7 @@ export function issueRoutes(
         "Issue not found",
       );
       if (!issue) return;
+      await assertRunServesTask(db, req, issue);
 
       if (issue.projectId) {
         const project = await projectsSvc.getById(issue.projectId);
