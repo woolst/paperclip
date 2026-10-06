@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Router } from "express";
 import type { Request } from "express";
+import { isPaperclipSkillsRoot } from "../services/bundled-skills-root.js";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, ne } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import {
@@ -180,6 +181,7 @@ function readSkillMarkdown(skillName: string): string | null {
     path.resolve(moduleDir, "../../../skills", normalized, "SKILL.md") // dev: src/routes/ -> repo root/skills/
   ].filter((candidate): candidate is string => Boolean(candidate));
   for (const skillPath of candidates) {
+    if (skillPath !== candidates[0] && !isPaperclipSkillsRoot(path.dirname(path.dirname(skillPath)))) continue;
     try {
       return fs.readFileSync(skillPath, "utf8");
     } catch {
@@ -203,7 +205,7 @@ function resolvePaperclipSkillsDir(): string | null {
   ];
   for (const candidate of candidates) {
     try {
-      if (fs.statSync(candidate).isDirectory()) return candidate;
+      if (fs.statSync(candidate).isDirectory() && isPaperclipSkillsRoot(candidate)) return candidate;
     } catch { /* skip */ }
   }
   return null;
