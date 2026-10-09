@@ -68,6 +68,7 @@ export interface HeartbeatExecutionConfigurationInput {
   onFailureSecretsResolved: (readSecrets: () => string[]) => void;
   onManagedAiRuntimeAcquired: (runtime: ManagedAiRuntime) => void;
   onIdentityRedactorPrepared: (redactor: ReturnType<typeof createAgentIdentityRedactor>) => void;
+  forkNoCopyRun?: (mergedConfig: Record<string, unknown>) => Promise<void>; // fork: the run guard (server/src/fork-no-copy.ts)
 }
 
 /** Assembles effective run configuration; the executor retains cleanup ownership. */
@@ -95,6 +96,7 @@ export async function prepareHeartbeatExecutionConfiguration(db: Db, input: Hear
     // preserving isolated mode and the mandatory sandbox preflight.
     ...(useIsolatedTaskDirectory ? { workspaceStrategy: { type: "project_primary" } } : {}),
   };
+  await input.forkNoCopyRun?.(mergedConfig); // fork: once the run's config is merged
   const configSnapshot = buildExecutionWorkspaceConfigSnapshot(
     mergedConfig,
     selectedEnvironmentId,

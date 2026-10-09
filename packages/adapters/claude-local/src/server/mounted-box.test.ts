@@ -56,7 +56,7 @@ vi.mock("@paperclipai/adapter-utils/execution-target", async () => ({
 
 import { execute } from "./execute.js";
 import { resetClaudeCliCapabilitiesCacheForTests } from "./cli-capabilities.js";
-import { BOX_REFUSALS, boxBundleMacDir, defaultBoxMountsPath, mapToBox, writeBoxBundle } from "./mounted-box.js";
+import { BOX_REFUSALS, boxInstructionsText, boxShareMacDir, boxSkillLinks, defaultBoxMountsPath, linkBoxBundle, mapToBox } from "./mounted-box.js";
 
 const TOKEN = "mcp-secret-token-4711";
 const AGENT_HOME = "/data/agent-homes/agent-1";
@@ -81,6 +81,7 @@ async function boxRun(over: { config?: Record<string, unknown>; context?: Record
     config: {
       engine: "cli", command: fake.CLAUDE, mountedBox: true, boxMounts: mountsFile, ultracode: true,
       instructionsFilePath: path.join(root, "AGENTS.md"), env: { CLAUDE_CONFIG_DIR: "/root/.claude" },
+      paperclipRuntimeSkills: [{ key: "paperclipai/paperclip/paperclip", runtimeName: "paperclip", source: path.join(macRoot, "skills", "paperclip") }],
       boxApiUrl: "http://10.0.2.2:3100", ...over.config,
     },
     context: over.context ?? { paperclipWorkspace: { cwd: projectDir, source: "project_primary", agentHome: macAgentHome } },
@@ -91,6 +92,17 @@ async function boxRun(over: { config?: Record<string, unknown>; context?: Record
   } as never);
   const claudeCall = fake.runChildProcess.mock.calls.find((call) => call[2].includes("--print"));
   return { result, logs, metas, args: claudeCall?.[2] ?? [], options: claudeCall?.[3] as Record<string, unknown> | undefined };
+}
+
+/** Every regular file under a folder but the run's generated MCP config: a copy shows as one; links do not. */
+async function filesUnder(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...await filesUnder(full));
+    else if (entry.isFile() && entry.name !== "mcp-config.json") out.push(full);
+  }
+  return out;
 }
 
 function flag(args: string[], name: string): string {
@@ -114,6 +126,8 @@ beforeEach(async () => {
   await mkdir(projectDir, { recursive: true });
   await mkdir(macAgentHome, { recursive: true });
   await writeFile(path.join(root, "AGENTS.md"), "Work in the box.\n", "utf8");
+  await mkdir(path.join(macRoot, "skills", "paperclip"), { recursive: true });
+  await writeFile(path.join(macRoot, "skills", "paperclip", "SKILL.md"), "# Paperclip\n", "utf8");
   await writeFile(mountsFile, JSON.stringify({ mounts: [
     { mac: macRoot, box: "/srv/mac", readOnly: true },
     { mac: path.join(macRoot, "projects"), box: "/srv/projects", readOnly: true },
@@ -133,15 +147,16 @@ afterEach(async () => {
 });
 
 describe("mounted box runs", () => {
-  it("runs in the mapped folder with the bundle from the share, the MCP text and the box API, copying nothing", async () => {
+  it("runs in the mapped folder with linked skills, inline instructions, the MCP text and the box API, copying nothing", async () => {
     const run = await boxRun();
     expect(run.result.errorCode ?? null).toBeNull();
     expect(fake.state.probes).toEqual([
       `if [ -d '/srv/projects/alpha' ]; then mkdir -p '${AGENT_HOME}' && echo box-folder-present; else echo box-folder-missing; fi`,
     ]);
     const bundle = flag(run.args, "--add-dir");
-    expect(bundle).toMatch(/^\/opt\/paperclip\/bundles\/company-1\/[0-9a-f]{64}$/);
-    expect(flag(run.args, "--append-system-prompt-file")).toBe(`${bundle}/agent-instructions.md`);
+    expect(bundle).toMatch(/^\/opt\/paperclip\/bundles\/company-1\/[0-9a-f]{64}-[0-9a-f]{16}$/);
+    expect(run.args).not.toContain("--append-system-prompt-file");
+    expect(flag(run.args, "--append-system-prompt")).toContain("Work in the box.");
     expect(JSON.parse(flag(run.args, "--mcp-config"))).toEqual({ mcpServers: { linear: {
       type: "http", url: "https://mcp.example/linear", headers: { Authorization: `Bearer ${TOKEN}` } } } });
     expect(run.args).toContain("--strict-mcp-config");
@@ -149,12 +164,13 @@ describe("mounted box runs", () => {
     expect(meta.cwd).toBe("/srv/projects/alpha");
     expect(meta.env).toMatchObject({ AGENT_HOME, PAPERCLIP_API_URL: "http://10.0.2.2:3100" });
     expect((run.options?.env as Record<string, string>)).toMatchObject({ AGENT_HOME, PAPERCLIP_API_URL: "http://10.0.2.2:3100" });
-    const macBundle = boxBundleMacDir("company-1", path.posix.basename(bundle));
-    const instructions = await readFile(path.join(macBundle, "agent-instructions.md"), "utf8");
-    expect(instructions).toContain("Work in the box.");
-    expect(instructions).not.toContain(path.join(root, "AGENTS.md"));
+    const macBundle = path.join(boxShareMacDir(), "bundles", "company-1", path.posix.basename(bundle));
+    expect(await readdir(macBundle)).toEqual([".claude"]);
+    expect(await readdir(path.join(macBundle, ".claude", "skills"))).toEqual(["paperclip"]);
+    expect(await fs.readlink(path.join(macBundle, ".claude", "skills", "paperclip"))).toBe("/srv/mac/skills/paperclip");
+    expect(await filesUnder(path.join(root, "home"))).toEqual([]);
     const prompt = String(run.options?.stdin ?? "");
-    expect(prompt).toContain(`loaded from ${bundle}/agent-instructions.md. Resolve any relative file references from ${bundle}/. `);
+    expect(prompt).toContain(`Their folder on the Mac, ${root}/, is in no box, so sibling instruction files cannot be read in this run.`);
     expect(prompt).not.toContain(path.join(root, "AGENTS.md"));
     expect(run.logs.join("")).toContain(
       `[paperclip] Box run on box-one in /srv/projects/alpha (Mac folder ${projectDir}), nothing copied: model `,
@@ -163,10 +179,35 @@ describe("mounted box runs", () => {
     expect(run.logs.join("")).not.toContain("Syncing workspace");
   });
 
+  it("names the instruction file by its box path when a row maps it", async () => {
+    const file = path.join(macRoot, "agents", "coder", "AGENTS.md");
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, "Mapped instructions.\n", "utf8");
+    const run = await boxRun({ config: { instructionsFilePath: file } });
+    const prompt = String(run.options?.stdin ?? "");
+    expect(prompt).toContain("loaded from /srv/mac/agents/coder/AGENTS.md. Resolve any relative file references from /srv/mac/agents/coder/. ");
+    expect(prompt).not.toContain(macRoot);
+    expect(flag(run.args, "--append-system-prompt")).toContain("Mapped instructions.");
+  });
+
+  it("leaves out a skill whose folder is in no box and names it, copying nothing", async () => {
+    const outside = path.join(root, "outside-skill");
+    await mkdir(outside, { recursive: true });
+    await writeFile(path.join(outside, "SKILL.md"), "# Outside\n", "utf8");
+    const run = await boxRun({ config: { paperclipRuntimeSkills: [{ key: "paperclipai/paperclip/paperclip", runtimeName: "paperclip", source: outside }] } });
+    expect(run.result.errorCode ?? null).toBeNull();
+    expect(run.logs.join("")).toContain(`[paperclip] Warning: skill "paperclip" is left out of this box run: its folder ${outside} is in no box.\n`);
+    const macBundle = path.join(boxShareMacDir(), "bundles", "company-1", path.posix.basename(flag(run.args, "--add-dir")));
+    expect(await readdir(path.join(macBundle, ".claude", "skills"))).toEqual([]);
+    expect(await filesUnder(path.join(root, "home"))).toEqual([]);
+  });
+
   it("masks the MCP bearer token in the logged command", async () => {
     const run = await boxRun();
     const logged = (run.metas[0] as { commandArgs: string[] }).commandArgs.join(" ");
     expect(logged).toContain(TOKEN);
+    expect(logged).not.toContain("Work in the box.");
+    expect(logged).toMatch(/\[agent instructions: \d+ characters, read in place, not logged\]/);
     const redactionPath = fileURLToPath(new URL("../../../../../server/src/redaction.ts", import.meta.url));
     const { redactSensitiveText } = (await import(redactionPath)) as { redactSensitiveText: (text: string) => string };
     expect(redactSensitiveText(logged)).not.toContain(TOKEN);
@@ -193,7 +234,7 @@ describe("mounted box runs", () => {
     const run = await boxRun();
     await expectRefused(run, BOX_REFUSALS.notInBox("/srv/projects/alpha"));
     expect(fake.state.probes[0]).toMatch(/^if \[ -d '\/srv\/projects\/alpha' \]/);
-    await expect(lstat(path.dirname(path.dirname(boxBundleMacDir("company-1", "k"))))).rejects.toThrow();
+    await expect(lstat(path.join(boxShareMacDir(), "bundles"))).rejects.toThrow();
   });
 
   it("refuses a project task that fell back to the agent's Mac home and never runs there", async () => {
@@ -236,7 +277,7 @@ describe("mounted box runs", () => {
   });
 
   it("refuses a share that cannot be written", async () => {
-    const shareRoot = path.dirname(path.dirname(path.dirname(boxBundleMacDir("company-1", "k"))));
+    const shareRoot = boxShareMacDir();
     await mkdir(path.dirname(shareRoot), { recursive: true });
     await writeFile(shareRoot, "not a folder", "utf8");
     const run = await boxRun();
@@ -252,29 +293,52 @@ describe("mounted box runs", () => {
 });
 
 describe("box bundle and mount table", () => {
-  it("writes a bundle once, beside and then renamed, with each link resolved to its files", async () => {
+  it("writes a bundle of links once, beside and then renamed, each link to the skill's box folder", async () => {
     const source = path.join(root, "cache", "bundle-key");
-    const skill = path.join(root, "skills", "paperclip");
+    const skill = path.join(macRoot, "skills", "paperclip");
+    const outside = path.join(root, "outside");
     await mkdir(path.join(source, ".claude", "skills"), { recursive: true });
-    await mkdir(skill, { recursive: true });
-    await writeFile(path.join(skill, "SKILL.md"), "# Paperclip\n", "utf8");
-    await writeFile(path.join(source, "agent-instructions.md"), "Instructions.\n", "utf8");
+    await mkdir(outside, { recursive: true });
     await symlink(skill, path.join(source, ".claude", "skills", "paperclip"));
+    await symlink(outside, path.join(source, ".claude", "skills", "outside"));
+    const links = await boxSkillLinks(source, [{ mac: macRoot, box: "/srv/mac" }]);
+    expect(links).toEqual([
+      { name: "outside", macFolder: outside, boxFolder: null },
+      { name: "paperclip", macFolder: skill, boxFolder: "/srv/mac/skills/paperclip" },
+    ]);
+    const real = await boxSkillLinks(source, [{ mac: await fs.realpath(macRoot), box: "/srv/mac" }]);
+    expect(real[1]?.boxFolder).toBe("/srv/mac/skills/paperclip");
+    // A skill folder inside a row that is itself a link to a folder in no box is left out.
+    await symlink(outside, path.join(macRoot, "skills", "escape"));
+    await symlink(path.join(macRoot, "skills", "escape"), path.join(source, ".claude", "skills", "escape"));
+    const escaped = (await boxSkillLinks(source, [{ mac: macRoot, box: "/srv/mac" }])).find((link) => link.name === "escape");
+    expect(escaped?.boxFolder).toBeNull();
     const target = path.join(root, "share", "bundles", "company-1", "bundle-key");
     const rename = vi.spyOn(fs, "rename");
-    expect(await writeBoxBundle(source, target)).toBe(true);
+    expect(await linkBoxBundle(links, target)).toBe(true);
     expect(rename).toHaveBeenCalledTimes(1);
     const [from, to] = rename.mock.calls[0] as [string, string];
     expect(path.dirname(from)).toBe(path.dirname(target));
     expect(to).toBe(target);
     expect(await readdir(path.dirname(target))).toEqual(["bundle-key"]);
-    const copied = path.join(target, ".claude", "skills", "paperclip");
-    expect((await lstat(copied)).isSymbolicLink()).toBe(false);
-    expect(await readFile(path.join(copied, "SKILL.md"), "utf8")).toBe("# Paperclip\n");
-    await writeFile(path.join(target, "marker"), "kept", "utf8");
-    expect(await writeBoxBundle(source, target)).toBe(false);
+    expect(await readdir(path.join(target, ".claude", "skills"))).toEqual(["paperclip"]);
+    expect(await fs.readlink(path.join(target, ".claude", "skills", "paperclip"))).toBe("/srv/mac/skills/paperclip");
+    expect(await filesUnder(target)).toEqual([]);
+    expect(await linkBoxBundle(links, target)).toBe(false);
     expect(rename).toHaveBeenCalledTimes(1);
-    expect(await readFile(path.join(target, "marker"), "utf8")).toBe("kept");
+  });
+
+  it("turns the instruction line's Mac paths into box paths, or says the folder is in no box", () => {
+    const rows = [{ mac: "/Users/a/Projects", box: "/data/workspace/Projects" }];
+    const line = "Agent instructions for this run were loaded from /Users/a/Projects/co/agents/ceo/AGENTS.md. " +
+      "Resolve any relative file references from /Users/a/Projects/co/agents/ceo/. ";
+    expect(boxInstructionsText(line, "/Users/a/Projects/co/agents/ceo/AGENTS.md", rows)).toBe(
+      "Agent instructions for this run were loaded from /data/workspace/Projects/co/agents/ceo/AGENTS.md. " +
+      "Resolve any relative file references from /data/workspace/Projects/co/agents/ceo/. ");
+    expect(boxInstructionsText(line.replaceAll("/Users/a/Projects", "/Users/a/.paperclip"), "/Users/a/.paperclip/co/agents/ceo/AGENTS.md", rows))
+      .toBe("Agent instructions for this run are in the system prompt. Their folder on the Mac, /Users/a/.paperclip/co/agents/ceo/, " +
+        "is in no box, so sibling instruction files cannot be read in this run.");
+    expect(boxInstructionsText("", "/Users/a/Projects/x/AGENTS.md", rows)).toBe("");
   });
 
   it("maps by the longest matching Mac folder, below folders included", () => {

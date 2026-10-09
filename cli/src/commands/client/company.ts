@@ -1696,7 +1696,7 @@ export function registerCompanyCommands(program: Command): void {
           }
 
           let sourcePayload:
-            | { type: "inline"; rootPath?: string | null; files: Record<string, CompanyPortabilityFileEntry> }
+            | { type: "inline"; rootPath?: string | null; files: Record<string, CompanyPortabilityFileEntry>; localRoot?: string }
             | { type: "github"; url: string };
           let chunkedZip: { zipBytes: Uint8Array; rootPath: string } | null = null;
 
@@ -1715,7 +1715,7 @@ export function registerCompanyCommands(program: Command): void {
             if (opts.ref?.trim()) {
               throw new Error("--ref is only supported for GitHub import sources.");
             }
-            chunkedZip = await resolveChunkedImportZip(
+            chunkedZip = path.extname(from).toLowerCase() !== ".zip" ? null : await resolveChunkedImportZip( // fork: a folder is imported in place, never stored on the server
               from,
               target === "existing"
                 ? EXISTING_COMPANY_CHUNKED_IMPORT_THRESHOLD_BYTES
@@ -1731,6 +1731,7 @@ export function registerCompanyCommands(program: Command): void {
                 type: "inline",
                 rootPath: inline.rootPath,
                 files: inline.files,
+                ...(path.extname(from).toLowerCase() === ".zip" ? {} : { localRoot: (await stat(path.resolve(from))).isDirectory() ? path.resolve(from) : path.dirname(path.resolve(from)) }), // fork: the import uses the folder's files in place
               };
             }
           }

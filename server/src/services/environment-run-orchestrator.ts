@@ -452,6 +452,7 @@ export function environmentRunOrchestrator(
     }
 
     const provisionCommand = workspaceRealizationRequest.runtimeOverlay.provisionCommand?.trim() ?? "";
+    if (provisionCommand) throw new Error("Fork: Paperclip never copies files for a run (a workspace provision command, which may copy, is disabled)."); // fork: no copy
     const realizedCwd =
       realizedWorkspaceCwd ??
       (typeof lease.metadata?.remoteCwd === "string" && lease.metadata.remoteCwd.trim().length > 0

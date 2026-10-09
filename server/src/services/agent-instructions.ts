@@ -616,6 +616,7 @@ export function agentInstructionsService(db?: Db) {
     if (nextMode === "managed" && !existingFiles.includes(nextEntryFile)) {
       await assertUnversionedEntry(agent, nextEntryFile);
     }
+    if (existingFiles.length === 0 || !existingFiles.includes(nextEntryFile)) throw unprocessable("Fork: Paperclip never copies files (writing instructions into a new folder is disabled)."); // fork: no copy
     const exported = await exportFiles(agent);
     if (existingFiles.length === 0) {
       await writeBundleFiles(nextRootPath, exported.files);
@@ -802,6 +803,7 @@ export function agentInstructionsService(db?: Db) {
   async function materializeManagedBundle(
     ...args: Parameters<typeof materializeManagedBundleUnversioned>
   ) {
+    if (!0) throw unprocessable("Fork: Paperclip never copies files (a managed copy of an agent's instructions is disabled)."); // fork: no copy
     if (!db) throw unprocessable("Bundle initialization requires the database-backed instructions service");
     return db.transaction(async (tx) => {
       const agent = args[0];

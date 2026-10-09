@@ -101,7 +101,7 @@ import {
   createClaudeAcpExecutor,
   resolveClaudeExecutionEngineForRun,
 } from "./acp.js";
-import { forkRefuseRun, forkRunEffort, forkRunRefusal, forkSettingsArgs } from "./fork-run-args.js";
+import { forkInstructionsBody, forkLoggedArgs, forkRefuseRun, forkRunEffort, forkRunRefusal, forkSettingsArgs } from "./fork-run-args.js";
 import { forkMountedBox } from "./mounted-box.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -509,7 +509,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   let instructionsPathDirective = "";
   if (instructionsFilePath) {
     try {
-      const instructionsContent = await fs.readFile(instructionsFilePath, "utf-8");
+      const instructionsContent = forkInstructionsBody(await fs.readFile(instructionsFilePath, "utf-8")); // fork: in-place instructions
       instructionsPathDirective =
         `Agent instructions for this run were loaded from ${instructionsFilePath}. ` +
         `Resolve any relative file references from ${instructionsFileDir}. ` +
@@ -882,6 +882,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     if (attemptInstructionsFilePath && !resumeSessionId) {
       args.push("--append-system-prompt-file", attemptInstructionsFilePath);
     }
+    if (promptBundle.instructionsText && !resumeSessionId) args.push("--append-system-prompt", promptBundle.instructionsText); // fork: the instructions go inline; no file holds a copy
     if (runtimeMcpServers.length > 0) {
       args.push("--mcp-config", effectiveMcpConfigPath, "--strict-mcp-config");
     }
@@ -955,6 +956,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         `Injected agent instructions via --append-system-prompt-file ${instructionsFilePath} (with current file location in the run prompt)`,
       );
     }
+    if (promptBundle.instructionsText && !resumeSessionId) commandNotes.push("Injected agent instructions inline via --append-system-prompt (fork: no copy of them is written)."); // fork: no copy
     if (runtimeMcpServers.length > 0) {
       commandNotes.push(
         `Using ${runtimeMcpServers.length} Paperclip-managed MCP server(s) from strict config ${effectiveMcpConfigPath}.`,
@@ -965,7 +967,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         adapterType: "claude_local",
         command: resolvedCommand,
         cwd: effectiveExecutionCwd,
-        commandArgs: args,
+        commandArgs: forkLoggedArgs(args), // fork: the instructions are not copied into the run log
         commandNotes,
         env: loggedEnv,
         prompt,

@@ -3085,6 +3085,7 @@ export function agentRoutes(
       const companyId = req.params.companyId as string;
       const type = assertKnownAdapterType(req.params.type as string);
       await assertCanCreateAgentsForCompany(req, companyId);
+      const forkNoCopy = await import("../fork-no-copy.js"); if (!forkNoCopy.NO_COPY_ADAPTERS.has(type)) throw unprocessable(forkNoCopy.NO_COPY_TEXT.adapter(type)); // fork: no copy
 
       const adapter = requireServerAdapter(type);
 

@@ -92,6 +92,7 @@ async function verifyMaterializedAsset(
 }
 
 export async function materializeAsset(files: AssetFile[]): Promise<NativeRuntimeAssetReference> {
+  if (!0) throw new Error("Fork: Paperclip never copies files (a connector or runtime skill written out as a copy is disabled)."); // fork: no copy
   const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
   const manifestFiles = sorted.map((file) => ({ path: safeRelativePath(file.path, "runtime context path"), sha256: sha256(file.content), mode: file.mode & 0o555, size: file.content.byteLength }));
   const totalBytes = manifestFiles.reduce((sum, file) => sum + file.size, 0);
