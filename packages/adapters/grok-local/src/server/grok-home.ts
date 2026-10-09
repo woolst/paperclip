@@ -168,6 +168,7 @@ export async function stageGrokHomeForSync(
   effectiveGrokHome: string,
   options: StageGrokHomeForSyncOptions = {},
 ): Promise<string> {
+  if (!0) throw new Error("Fork: Paperclip never copies files (a copy of the Grok home is disabled)."); // fork: no copy
   const runIdPart = nonEmpty(options.runId ?? undefined);
   const stagedHome = await fs.mkdtemp(
     path.join(os.tmpdir(), `paperclip-grok-home-sync-${runIdPart ? `${runIdPart}-` : ""}`),

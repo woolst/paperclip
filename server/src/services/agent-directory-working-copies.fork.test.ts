@@ -11,9 +11,9 @@ import { startEmbeddedPostgresTestDatabase } from "../__tests__/helpers/embedded
 import { agentInstructionWorkingCopyService } from "./agent-instruction-working-copies.js";
 import { resolveManagedInstructionsRoot } from "./agent-instructions.js";
 
-// Fork: a mounted-box agent reads its instructions from the share bundle, so
-// no run copies the agent folder into the box over SSH.
-describe("agent folder copy for a mounted-box run", () => {
+// Fork: Paperclip never copies files for a run, so no run copies the agent folder: not into a box over
+// SSH, not into a local working copy.
+describe("no agent folder copy for any run", () => {
   let database: Awaited<ReturnType<typeof startEmbeddedPostgresTestDatabase>>;
   let db: ReturnType<typeof createDb>;
   let copies: ReturnType<typeof agentInstructionWorkingCopyService>;
@@ -108,22 +108,21 @@ describe("agent folder copy for a mounted-box run", () => {
     expect(outcome).toBeNull();
   });
 
-  it("copies over SSH for an agent without a mounted box, as upstream", async () => {
+  it("makes no copy over SSH for an agent without a mounted box", async () => {
     const agentId = await makeAgent(false);
     const runId = await newRun(agentId);
-    const copy = (await copies.prepare({ companyId, agentId, runId, cwd: home, target: sshTarget() }))!;
-    expect(copy).not.toBeNull();
-    expect(spies.stage).toHaveBeenCalledTimes(1);
-    expect(spies.stage).toHaveBeenCalledWith(expect.objectContaining({ remoteDir: copy.executionRoot }));
-    expect(await fs.readFile(path.join(copy.executionRoot, entryFile), "utf8")).toBe(initial);
+    expect(await copies.prepare({ companyId, agentId, runId, cwd: home, target: sshTarget() })).toBeNull();
+    noSpyCalled();
+    expect(await rowsFor(runId)).toEqual([]);
   });
 
-  it("copies locally for a mounted-box agent on a local target, as upstream", async () => {
-    const agentId = await makeAgent(true);
-    const runId = await newRun(agentId);
-    const copy = await copies.prepare({ companyId, agentId, runId, cwd: home });
-    expect(copy?.location).toBe("local");
-    expect(await fs.readFile(path.join(copy!.localRoot, entryFile), "utf8")).toBe(initial);
-    noSpyCalled();
-  });
+  for (const mountedBox of [true, false]) {
+    it(`makes no local copy for an agent ${mountedBox ? "with" : "without"} a mounted box`, async () => {
+      const agentId = await makeAgent(mountedBox);
+      const runId = await newRun(agentId);
+      expect(await copies.prepare({ companyId, agentId, runId, cwd: home })).toBeNull();
+      expect(await rowsFor(runId)).toEqual([]);
+      noSpyCalled();
+    });
+  }
 });

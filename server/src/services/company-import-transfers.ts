@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Db } from "@paperclipai/db";
+import { unprocessable } from "../errors.js"; // fork: no copy
 import { resolvePaperclipInstanceRoot } from "../home-paths.js";
 import { companyTransferRunService } from "./company-transfer-runs.js";
 
@@ -61,6 +62,7 @@ export async function writeImportTransferPart(
   index: number,
   bytes: Buffer,
 ): Promise<void> {
+  if (!0) throw unprocessable("Fork: Paperclip never copies files (a package stored on the server for its import is disabled)."); // fork: no copy
   const target = partPathFor(spoolRoot, runId, index);
   await fs.mkdir(path.dirname(target), { recursive: true });
   const tempPath = `${target}.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

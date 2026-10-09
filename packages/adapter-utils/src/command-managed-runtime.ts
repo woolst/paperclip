@@ -574,6 +574,7 @@ export async function prepareCommandManagedRuntime(input: {
   /** Copy-back retry delays; pass `[]` for throwaway workspaces that must not wait on retries. */
   workspaceRestoreRetryDelaysMs?: readonly number[];
 }): Promise<PreparedSandboxManagedRuntime> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (prepareCommandManagedRuntime is disabled)."); // fork: no copy
   const timeoutMs = input.spec.timeoutMs && input.spec.timeoutMs > 0 ? input.spec.timeoutMs : 300_000;
   const workspaceRemoteDir = input.workspaceRemoteDir ?? input.spec.remoteCwd;
   // Managed-runtime sync/restore scripts use absolute paths throughout, so

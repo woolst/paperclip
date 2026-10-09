@@ -2676,6 +2676,7 @@ export function heartbeatService(
         onFailureSecretsResolved: (readSecrets) => { readFailureReportSecrets = readSecrets; },
         onManagedAiRuntimeAcquired: (runtime) => { managedAiRuntime = runtime; },
         onIdentityRedactorPrepared: (redactor) => { identityRedactor = redactor; },
+        forkNoCopyRun: async (mergedConfig) => (await import("../fork-no-copy.js")).forkNoCopyRun(db, { adapterType: agent.adapterType, config: mergedConfig, environmentDriver: selectedEnvironmentForConfig?.driver, workspaceMode: requestedExecutionWorkspaceMode, projectId: executionProjectId, reusedStrategy: requestedShouldReuseExisting ? reusableExistingExecutionWorkspace?.strategyType : null, companyId: agent.companyId }),
       }));
       if (!executionConfiguration.prepared) return;
       const {

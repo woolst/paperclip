@@ -1406,6 +1406,7 @@ export async function syncDirectoryToSsh(input: {
   onProgress?: RuntimeProgressSink;
   progressLabel?: string;
 }): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (syncDirectoryToSsh is disabled)."); // fork: no copy
   const auth = await createSshAuthArgs(input.spec);
   const sshArgs = [
     ...auth.args,
@@ -1529,6 +1530,7 @@ export async function syncDirectoryFromSsh(input: {
   onProgress?: RuntimeProgressSink;
   progressLabel?: string;
 }): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (syncDirectoryFromSsh is disabled)."); // fork: no copy
   const auth = await createSshAuthArgs(input.spec);
   const stagingDir = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-ssh-sync-back-"));
   const remoteTarScript = [
@@ -1645,6 +1647,7 @@ export async function prepareWorkspaceForSshExecution(input: {
   workspaceFileMode?: "all";
   workspaceExclude?: string[];
 }): Promise<{ gitBacked: boolean; repositories?: string[] }> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (prepareWorkspaceForSshExecution is disabled)."); // fork: no copy
   const remoteDir = input.remoteDir ?? input.spec.remoteCwd;
   const gitSnapshot = input.workspaceFileMode === "all" ? null : await readLocalGitWorkspaceSnapshot(input.localDir);
 
@@ -1703,6 +1706,7 @@ export async function restoreWorkspaceFromSshExecution(input: {
   onProgress?: RuntimeProgressSink;
   repositories?: Array<{ path: string; baselineSnapshot?: DirectorySnapshot }>;
 }): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (restoreWorkspaceFromSshExecution is disabled)."); // fork: no copy
   const remoteDir = input.remoteDir ?? input.spec.remoteCwd;
   const repositories = input.repositories ?? [];
   for (const repository of repositories) {

@@ -509,6 +509,7 @@ export async function prepareProjectRepositoryWorkspaces(input: {
     seen.add(identity(workspace.repoUrl));
     return true;
   });
+  if (selected.length > 0) throw new Error("Fork: Paperclip never copies files for a run (a clone of the project's other repositories is disabled)."); // fork: no copy
   if (input.restoredContents?.checkouts.some(checkout => !selected.some(source => source.id === checkout.source.id))) throw new GitCacheRestorationFailure();
   const root = path.join(input.cwd, PROJECT_REPOSITORIES_DIR);
   if (selected.length === 0 && !(await fs.lstat(root).catch(() => null))) return [];

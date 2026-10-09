@@ -37,6 +37,7 @@ export async function materializeManagedProjectWorkspace(
     return { cwd, warning: null };
   }
 
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the managed checkout's git clone is disabled)."); // fork: no copy
   const hasAdoptableGitDir = () => measureRunPhase("workspace.checkout.lookup", () =>
     fs
       .stat(path.resolve(cwd, ".git"))

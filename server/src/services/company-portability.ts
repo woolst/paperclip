@@ -5286,6 +5286,7 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
     const importedAutomationPausedAt = pauseAutomations ? new Date() : null;
     const warnings = [...plan.preview.warnings];
     const include = plan.include;
+    const forkRoot = await (await import("../fork-in-place-import.js")).forkAssertInPlace(input.source, plan.source.files, plan.source.manifest, mode); // fork: no copy
 
     if (include.agents) {
       const importedAgentSlugs = new Set(
@@ -5571,6 +5572,7 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
 
       const importedSkills = include.skills || include.agents
         ? await companySkills.importPackageFiles(targetCompany.id, pickTextFiles(plan.source.files), {
+            localRoot: forkRoot, // fork: the skills stay in the package's folder
             onConflict: resolveSkillConflictStrategy(mode, plan.collisionStrategy),
           })
         : [];
@@ -5716,7 +5718,7 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
               continue;
             }
             try {
-              const materialized = await instructions.materializeManagedBundle(updated, bundleFiles, {
+              const materialized = await (await import("../fork-in-place-import.js")).forkInstructionsBundle(forkRoot, instructions, manifestAgent.path, updated, bundleFiles, { // fork: no copy
                 clearLegacyPromptTemplate: true,
                 replaceExisting: true,
               });
@@ -5764,7 +5766,7 @@ export function companyPortabilityService(db: Db, storage?: StorageService) {
             actorUserId ?? null,
           );
           try {
-            const materialized = await instructions.materializeManagedBundle(created, bundleFiles, {
+            const materialized = await (await import("../fork-in-place-import.js")).forkInstructionsBundle(forkRoot, instructions, manifestAgent.path, created, bundleFiles, { // fork: no copy
               clearLegacyPromptTemplate: true,
               replaceExisting: true,
             });

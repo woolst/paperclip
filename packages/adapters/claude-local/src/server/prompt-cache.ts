@@ -16,6 +16,7 @@ export interface ClaudePromptBundle {
   rootDir: string;
   addDir: string;
   instructionsFilePath: string | null;
+  instructionsText?: string | null; // fork: the instructions' text, passed inline
 }
 
 function nonEmpty(value: string | undefined): string | null {
@@ -158,9 +159,7 @@ export async function prepareClaudePromptBundle(input: {
     }
   }
 
-  const instructionsFilePath = instructionsContents
-    ? path.join(rootDir, "agent-instructions.md")
-    : null;
+  const instructionsFilePath: string | null = null; // fork: no copy of the instructions is written; the run passes their text inline
   if (instructionsFilePath && instructionsContents) {
     await ensureReadableFile(instructionsFilePath, instructionsContents);
   }
@@ -170,5 +169,6 @@ export async function prepareClaudePromptBundle(input: {
     rootDir,
     addDir: rootDir,
     instructionsFilePath,
+    instructionsText: instructionsContents, // fork: no copy
   };
 }

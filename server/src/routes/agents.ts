@@ -3099,6 +3099,7 @@ export function agentRoutes(
       const companyId = req.params.companyId as string;
       let type = assertKnownAdapterType(req.params.type as string);
       await assertCanCreateAgentsForCompany(req, companyId);
+      const forkNoCopy = await import("../fork-no-copy.js"); if (!forkNoCopy.NO_COPY_ADAPTERS.has(type)) throw unprocessable(forkNoCopy.NO_COPY_TEXT.adapter(type)); // fork: no copy
 
       const requestedBinding = req.body.aiConnection ? aiRuntimeConnectionBindingSchema.parse(req.body.aiConnection) : undefined;
       const aiBinding = requestedBinding?.mode === "router" ? undefined : requestedBinding;
