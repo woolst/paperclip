@@ -155,6 +155,13 @@
         "packages/adapters/claude-local/src/server/fork-no-copy.test.ts",
         "packages/adapters/claude-local/src/server/mounted-box.test.ts"
       ]
+    },
+    {
+      "subject": "fork(tools): a static guard run for the deploy sync",
+      "files": {},
+      "tests": [
+        "fork/test_rebase_guard.py"
+      ]
     }
   ],
   "sshCopyCalls": [

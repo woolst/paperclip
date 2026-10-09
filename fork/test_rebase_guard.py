@@ -191,6 +191,24 @@ class Guard(unittest.TestCase):
         self.cases([(None, {}, "1 live run")], 5)
         self.cases([(None, {}, "1 live run")], 5, "idle")
 
+    def test_static_runs_while_agents_run_and_runs_no_tool(self):
+        self.runs = [{"id": "run-1"}]
+        self.cases([(None, {}, "replay onto " + sh(self.up, "rev-parse", "HEAD")[:9], "static")], 0, "check --static")
+        self.assertEqual(self.tools, [])
+        self.assertNotIn("runs", self.calls)
+        self.assertEqual(self.last()["command"], "check --static")
+        self.assertEqual(self.run_guard("check --static --update-lockfile"), 4, self.line)
+
+    def test_static_still_trips_and_conflicts(self):
+        self.cases([("fork(x): later", {"server/src/more.ts": "await fs.cp(x, y)\n", LATER: "\n"}, "file copy call"),
+                    ("fork(x): later", {"server/src/new.ts": CALL + ")\n", LATER: "\n"}, "server/src/new.ts")],
+                   3, "check --static")
+        self.cases([("fork(x): no row", {"src/new.ts": "\n"}, "no row")], 2, "check --static")
+        sh(self.fork, "reset", "-q", "--hard", self.head)
+        commit(self.up, "upstream edit", {"src/a.ts": "one\n2\nthree\n"})
+        self.assertEqual(self.run_guard("check --static"), 1, self.line)
+        self.assertEqual(self.tools, [])
+
     def test_a_type_or_token_check(self):
         self.failing = lambda argv, cwd: "check:token-gates" in argv
         self.assertEqual(self.run_guard(), 5, self.line)
@@ -262,7 +280,7 @@ class Budget(unittest.TestCase):
 
     def test_the_budget_rows(self):
         rows = self.hooks["commits"]
-        self.assertEqual(len(rows), 12)
+        self.assertEqual(len(rows), 13)
         self.assertTrue(all(r["subject"].startswith("fork(") and r["tests"] for r in rows))
         files = [(path, n) for r in rows for path, n in r["files"].items()]
         self.assertEqual(sum(n for _, n in files), 150)

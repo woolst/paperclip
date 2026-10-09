@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The fork's rebase guard: python3 fork/rebase-guard.py check [--update-lockfile] | idle. Exit status, with one
+"""The fork's rebase guard: python3 fork/rebase-guard.py check [--update-lockfile | --static] | idle. Exit status, with one
 printed line: 0 clean; 1 a fork commit conflicts; 2 footprint breach; 3 a fork test fails or is
 missing, a tripwire fires, or a type or token check fails on the fork's head only or adds a type
 error to those upstream's head has; 4 setup fails,
@@ -7,7 +7,9 @@ or port 3100 is served from outside this repository; 5 skipped. The type checks 
 type definitions (build:typescript, no Rust); the server's is then ensure-build-deps and tsc --noEmit, since its
 own typecheck script builds the Rust runner.
 --update-lockfile installs without the frozen lockfile, as the deploy script's flag of that name does,
-for an upstream head whose own lockfile is stale; the trial worktree and its lockfile are thrown away."""
+for an upstream head whose own lockfile is stale; the trial worktree and its lockfile are thrown away.
+--static runs the footprint, the trial rebase and the tripwires alone, in seconds and while agents run: no
+skip check, no install, no type checks, no tests. The deploy script's sync runs it before it moves master."""
 import datetime
 import json
 import os
@@ -296,9 +298,9 @@ def record(work, command, heads, stop):
     with open(path + ".tmp", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(path + ".tmp", path)
-def check(repo, heads, update=False):
+def check(repo, heads, update=False, static=False):
     work, live, hooks = setup(repo, heads)
-    skip_check(live)
+    if not static: skip_check(live)
     base = heads["upstream"] = fetch(repo, hooks["upstream"])
     rows = dict((row["subject"], row) for row in hooks["commits"])
     commits = footprint(repo, base, rows)
@@ -306,7 +308,7 @@ def check(repo, heads, update=False):
     fresh_worktree(repo, wt, "HEAD")
     taken = trial_rebase(wt, base, commits)
     tripwires(wt, hooks)
-    types = run_tests(repo, work, wt, base, commits, rows, update)
+    types = "; static: no install, type checks or tests" if static else run_tests(repo, work, wt, base, commits, rows, update)
     git(["worktree", "remove", "--force", wt], repo)
     note = "; taken upstream, empty: " + "; ".join(taken) if taken else ""
     raise Stop(0, "clean: %d fork commits replay onto %s%s%s" % (len(commits), base[:9], note, types))
@@ -318,9 +320,9 @@ def main(argv=None, repo=None):
             skip_check(folders()[1])
             live_check(repo)
             raise Stop(0, "idle: no live run; port %d free or served from this repository" % PORT)
-        if argv[:1] != ["check"] or argv[1:] not in ([], ["--update-lockfile"]):
-            raise Stop(4, "usage: rebase-guard.py check [--update-lockfile] | idle")
-        check(repo, heads, argv[1:] == ["--update-lockfile"])
+        if argv[:1] != ["check"] or argv[1:] not in ([], ["--update-lockfile"], ["--static"]):
+            raise Stop(4, "usage: rebase-guard.py check [--update-lockfile | --static] | idle")
+        check(repo, heads, argv[1:] == ["--update-lockfile"], argv[1:] == ["--static"])
     except Stop as e:
         stop = e
     except Exception as e:
