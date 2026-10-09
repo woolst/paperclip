@@ -433,7 +433,7 @@ export function agentEnvironmentTestService(db: Db, pluginWorkerManager?: Plugin
 
   // The environment drivers the adapter Test route accepts. A local, SSH, or
   // sandbox environment can host a probe; a plugin environment cannot.
-  const ADAPTER_TEST_ALLOWED_ENVIRONMENT_DRIVERS = ["local", "ssh", "sandbox"];
+  const ADAPTER_TEST_ALLOWED_ENVIRONMENT_DRIVERS = ["local", "ssh"]; // fork: no copy (a sandbox test copies to its target)
 
   // The fail-closed tenant-binding guard for the adapter Test route. A caller
   // may name any instance environment by id, so the route must reject an
@@ -517,6 +517,7 @@ export function agentEnvironmentTestService(db: Db, pluginWorkerManager?: Plugin
     }
     if (!result.checks.some(check => check.code.includes("hello_probe"))) {
       const providerAdapter = context.config.managedAiRouting ? aiRoutingHarness(adapterType, context.config.provider, context.config.acpxAgent) : { anthropic: "claude_local", openai: "codex_local", openrouter: "opencode_local", xai: "grok_local", google: "gemini_local" }[binding.provider];
+      if (!(await import("../fork-no-copy.js")).NO_COPY_ADAPTERS.has(providerAdapter)) throw unprocessable((await import("../fork-no-copy.js")).NO_COPY_TEXT.adapter(providerAdapter)); // fork: no copy
       const probe = await requireServerAdapter(providerAdapter).testEnvironment({ ...context, adapterType: providerAdapter, config: { ...context.config, engine: "cli" } });
       result.checks.push(...probe.checks);
       result.status = probe.status === "fail" ? "fail" : result.status === "warn" || probe.status === "warn" ? "warn" : "pass";

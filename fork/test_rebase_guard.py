@@ -24,6 +24,7 @@ HOOKS = {"upstream": {"remote": "upstream", "branch": "master"},
                      {"subject": "fork(x): edit", "files": {"src/a.ts": 2}, "tests": ["src/a.test.ts"]},
                      {"subject": "fork(x): later", "files": {"server/src/routes/issues.ts": 1}, "tests": [LATER]}],
          "sshCopyCalls": ["syncDirectoryToSsh"], "sshCopyCallers": ["server/src/ssh.ts"],
+         "copyCalls": ["fs.cp(", "\"clone\""], "copyCallers": ["server/src/copy.ts"],
          "issueWorkspaceChecks": 2}
 
 def sh(cwd, *args):
@@ -56,6 +57,7 @@ class Guard(unittest.TestCase):
         sh(self.up, "init", "-q")
         sh(self.up, "symbolic-ref", "HEAD", "refs/heads/master")
         commit(self.up, "base", {"src/a.ts": "one\ntwo\nthree\n", "server/src/ssh.ts": CALL + ")\n",
+                                 "server/src/copy.ts": "await fs.cp(a, b)\n",
                                  "server/src/routes/issues.ts": CHECK * 2})
         sh(self.root, "clone", "-q", "-o", "upstream", self.up, self.fork)
         commit(self.fork, "fork(tools): rebase guard", {"fork/hooks.json": json.dumps(HOOKS),
@@ -147,11 +149,13 @@ class Guard(unittest.TestCase):
 
     def test_tripwires_exit_3(self):
         self.cases([("fork(x): later", {"server/src/new.ts": CALL + ")\n", LATER: "\n"}, "server/src/new.ts"),
-                    ("fork(x): later", {"server/src/routes/issues.ts": CHECK * 3, LATER: "\n"}, "3 workspace")], 3)
+                    ("fork(x): later", {"server/src/routes/issues.ts": CHECK * 3, LATER: "\n"}, "3 workspace"),
+                    ("fork(x): later", {"packages/p/src/sync.ts": 'run(["git", "clone", url])\n', LATER: "\n"}, "packages/p/src/sync.ts"),
+                    ("fork(x): later", {"server/src/more.ts": "await fs.cp(x, y)\n", LATER: "\n"}, "file copy call")], 3)
 
     def test_a_readme_or_a_test_that_names_a_call_is_no_caller(self):
         self.cases([("fork(x): later", {"packages/x/README.md": CALL, LATER: "\n"}),
-                    ("fork(x): later", {"server/src/new.test.ts": CALL, LATER: "\n"})], 0)
+                    ("fork(x): later", {"server/src/new.test.ts": CALL + "fs.cp(", LATER: "\n"})], 0)
 
     def test_fork_tests_missing_or_failing_exit_3(self):
         self.cases([("fork(x): later", {"src/other.ts": "\n"}, "missing: " + LATER)], 3)
@@ -258,11 +262,11 @@ class Budget(unittest.TestCase):
 
     def test_the_budget_rows(self):
         rows = self.hooks["commits"]
-        self.assertEqual(len(rows), 11)
+        self.assertEqual(len(rows), 12)
         self.assertTrue(all(r["subject"].startswith("fork(") and r["tests"] for r in rows))
         files = [(path, n) for r in rows for path, n in r["files"].items()]
-        self.assertEqual(sum(n for _, n in files), 76)
-        self.assertEqual(len(set(path for path, _ in files)), 18)
+        self.assertEqual(sum(n for _, n in files), 150)
+        self.assertEqual(len(set(path for path, _ in files)), 46)
 
     def test_the_reviewed_lists_hold_at_the_base_commit(self):
         if G.git(["cat-file", "-e", "a1ab55a^{commit}"], G.REPO)[0]:
@@ -270,6 +274,10 @@ class Budget(unittest.TestCase):
         self.assertEqual(G.callers(G.REPO, self.hooks, "a1ab55a"), sorted(self.hooks["sshCopyCallers"]))
         text = G.git(["show", "a1ab55a:" + G.ISSUES], G.REPO)[1]
         self.assertEqual(text.count(G.ISSUE_CALL), self.hooks["issueWorkspaceChecks"])
+
+    def test_the_copy_callers_hold_at_the_head(self):
+        # Every file of the head that holds a copy call is reviewed; the list may name upstream files the head lacks yet.
+        self.assertLessEqual(set(G.copy_callers(G.REPO, self.hooks)), set(self.hooks["copyCallers"]))
 
 if __name__ == "__main__":
     unittest.main()

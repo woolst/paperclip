@@ -613,6 +613,7 @@ export async function seedManagedCodexHome(
   onLog: AdapterExecutionContext["onLog"],
   options: { apiKey?: string | null } = {},
 ): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files (the seed of a managed Codex home is disabled)."); // fork: no copy
   const apiKey = nonEmpty(options.apiKey ?? undefined);
 
   const sourceHome = resolveSharedCodexHomeDir(env);

@@ -635,6 +635,7 @@ export function executionWorkspaceRoutes(db: Db, opts: { pluginWorkerManager?: P
         };
 
         if (action === "repair") {
+          if (!0) throw unprocessable("Fork: Paperclip never copies files (the repair of a development worktree, which reseeds it, is disabled)."); // fork: no copy
           type RepairPhase =
             | "managed_stop"
             | "precondition_validation"

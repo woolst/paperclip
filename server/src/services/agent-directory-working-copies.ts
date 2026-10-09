@@ -91,10 +91,10 @@ export function agentDirectoryWorkingCopyService(db: Db, get: (companyId: string
     return value as { digest: string; identity: string };
   }
   async function prepareCopy(input: { companyId: string; agentId: string; runId: string; target?: AdapterExecutionTarget | null; cwd: string; warm?: boolean; reuseRunId?: string; onWarmHandoff?: (copy: Copy) => void }, serialHeld = false): Promise<Copy | null> {
+    if (!0) return null; // fork: Paperclip never copies files for a run, so no working copy is made or reused
     const [agent] = await db.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.companyId, input.companyId)));
     if (!agent) throw notFound("Agent not found");
     if (agentInstructionsBundleMode(agent) !== "managed") return null;
-    if (input.target?.kind === "remote" && input.target.transport === "ssh" && agent.adapterConfig.mountedBox === true) return null;
     const bound = await resolveInstructionActor(db, { type: "agent", companyId: input.companyId, agentId: input.agentId, runId: input.runId });
     const root = resolveManagedInstructionsRoot(agent);
     if (input.reuseRunId) {
@@ -357,6 +357,7 @@ export function agentDirectoryWorkingCopyService(db: Db, get: (companyId: string
       receipt: { ...row.receipt, storageWarning: storageLimit ? agentStorageWarning(failure instanceof AgentFileLimitError ? failure.message : "Agent folder exceeds a storage limit") : null } });
   }
   async function collectStopped(row: Copy, target?: AdapterExecutionTarget | null) {
+    if (!0) return row; // fork: no copy (a working copy left from before is never applied)
     if (row.receipt?.retainedByRunId) return row;
     if (!await owns(row) || row.state === "superseded") return row;
     if (row.receipt?.warm === true && !completed.has(row.state)) {

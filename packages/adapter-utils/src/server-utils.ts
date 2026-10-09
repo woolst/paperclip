@@ -4518,6 +4518,7 @@ export async function materializePaperclipSkillCopy(
   source: string,
   target: string,
 ): Promise<MaterializedPaperclipSkillCopyResult> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (materializePaperclipSkillCopy is disabled)."); // fork: no copy
   const sourceRoot = path.resolve(source);
   const targetRoot = path.resolve(target);
   const relativeTarget = path.relative(sourceRoot, targetRoot);

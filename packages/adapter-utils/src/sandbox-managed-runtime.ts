@@ -830,6 +830,7 @@ export async function createTarballFromDirectory(input: {
   exclude?: string[];
   followSymlinks?: boolean;
 }): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (createTarballFromDirectory is disabled)."); // fork: no copy
   const excludeArgs = ["._*", ...(input.exclude ?? [])].flatMap((entry) => ["--exclude", entry]);
   // Archive the directory's top-level entries BY NAME rather than ".". Archiving
   // "." embeds a "./" self-entry whose mode/mtime tar then tries to restore onto
@@ -903,6 +904,7 @@ export async function mirrorDirectory(
   targetDir: string,
   options: { preserveAbsent?: string[] } = {},
 ): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (mirrorDirectory is disabled)."); // fork: no copy
   await fs.mkdir(targetDir, { recursive: true });
   const preserveAbsent = new Set(options.preserveAbsent ?? []);
   const shouldPreserveAbsent = (relative: string) =>
@@ -1129,6 +1131,7 @@ export async function prepareSandboxManagedRuntime(input: {
   // never changes control flow (see `createRuntimeSpanRunner`).
   runtimeSpan?: RuntimeSpanRunner;
 }): Promise<PreparedSandboxManagedRuntime> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (prepareSandboxManagedRuntime is disabled)."); // fork: no copy
   const workspaceRemoteDir = input.workspaceRemoteDir ?? input.spec.remoteCwd;
   const runtimeRootDir = input.runtimeRootDir ?? path.posix.join(workspaceRemoteDir, ".paperclip-runtime", input.adapterKey);
   if (input.runtimeRootDir !== undefined) {

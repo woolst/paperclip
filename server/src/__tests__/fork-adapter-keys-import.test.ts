@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 // The fork's keys in a claude_local adapter config (fork C10). The import keeps
@@ -40,6 +43,7 @@ const secretSvc = {
 const agentInstructionsSvc = {
   exportFiles: vi.fn(async () => ({ files: { "AGENTS.md": "You are BoxCoder." }, entryFile: "AGENTS.md", warnings: [] })),
   materializeManagedBundle: vi.fn(async (agent: { adapterConfig?: Record<string, unknown> }) => ({ bundle: null, adapterConfig: agent.adapterConfig ?? {} })),
+  updateBundle: vi.fn(async (agent: { adapterConfig?: Record<string, unknown> }) => ({ bundle: null, adapterConfig: agent.adapterConfig ?? {} })),
 };
 const instanceSettingsSvc = { getExperimental: vi.fn(async () => ({ enableNativeRunner: false })) };
 const managedAgentProfileSvc = mocks("requireQualified");
@@ -47,6 +51,8 @@ const remoteAgentProfileSvc = mocks("requireQualified");
 
 vi.mock("../services/companies.js", () => ({ companyService: () => companySvc }));
 vi.mock("../services/agents.js", () => ({ agentService: () => agentSvc }));
+// Upstream creates an imported agent through the agent lifecycle; as in company-portability.test.ts, it lands on the agent create.
+vi.mock("../services/agent-lifecycle.js", () => ({ createAgentLifecycle: () => ({ requestHire: (...args: unknown[]) => agentSvc.create(...args) }) }));
 vi.mock("../services/access.js", () => ({ accessService: () => accessSvc }));
 vi.mock("../services/projects.js", () => ({ projectService: () => projectSvc }));
 vi.mock("../services/issues.js", () => ({ issueService: () => issueSvc }));
@@ -98,16 +104,28 @@ async function exportForkAgent() {
   return { portability, rootPath: exported.rootPath, files: exported.files };
 }
 
+// Writes the package to a folder, as it lies on the Mac; the import uses its files in place (fork: no copy).
+async function packageFolder(files: Files): Promise<string> {
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "fork-keys-import-")));
+  for (const [file, entry] of Object.entries(files)) {
+    await fs.mkdir(path.dirname(path.join(root, file)), { recursive: true });
+    await fs.writeFile(path.join(root, file), typeof entry === "string" ? Buffer.from(entry, "utf8") : Buffer.from(entry.data, "base64"));
+  }
+  return root;
+}
+
 // Imports the bundle and reads back the fork's keys of the config handed to the agent create.
 async function importAndReadBack(portability: ReturnType<typeof companyPortabilityService>, rootPath: string, files: Files) {
   agentSvc.create.mockClear();
+  const localRoot = await packageFolder(files);
   await portability.importBundle({
-    source: { type: "inline", rootPath, files },
+    source: { type: "inline", rootPath, files, localRoot },
     include,
     target: { mode: "new_company", newCompanyName: "Imported Paperclip" },
     agents: "all",
     collisionStrategy: "rename",
-  }, "user-1");
+  }, "user-1").finally(() => fs.rm(localRoot, { recursive: true, force: true }));
+  expect(agentInstructionsSvc.materializeManagedBundle).not.toHaveBeenCalled();
   const created = agentSvc.create.mock.calls.find(([, input]) => input?.name === "BoxCoder");
   expect(created).toBeDefined();
   const config = (created?.[1]?.adapterConfig ?? {}) as Record<string, unknown>;

@@ -211,6 +211,7 @@ export interface InstallDeviceLoginCredentialInput {
 export async function installDeviceLoginCredential(
   input: InstallDeviceLoginCredentialInput,
 ): Promise<InstallDeviceLoginOutcome> {
+  if (!0) throw new Error("Fork: Paperclip never copies files (a device login's credential copy is disabled)."); // fork: no copy
   const { sandboxAuthBytes, log } = input;
   const env = input.env ?? process.env;
   const companyId = requireSafeSegment(

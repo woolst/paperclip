@@ -521,6 +521,7 @@ async function materializeManagedProjectWorkspace(
     }
     return { cwd, warning: null };
   }
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the managed checkout's git clone is disabled)."); // fork: no copy
 
   const hasAdoptableGitDir = () =>
     fs
@@ -644,6 +645,7 @@ export async function prepareProjectRepositoryWorkspaces(input: {
     seen.add(identity(workspace.repoUrl));
     return true;
   });
+  if (selected.length > 0) throw new Error("Fork: Paperclip never copies files for a run (a clone of the project's other repositories is disabled)."); // fork: no copy
   const root = path.join(input.cwd, PROJECT_REPOSITORIES_DIR);
   if (selected.length === 0 && !(await fs.lstat(root).catch(() => null))) return [];
   await fs.mkdir(root, { recursive: true });

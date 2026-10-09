@@ -4366,6 +4366,7 @@ export async function startAdapterExecutionTargetPaperclipBridge(input: {
   if (!input.target || input.target.kind !== "remote") {
     return null;
   }
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (startAdapterExecutionTargetPaperclipBridge is disabled)."); // fork: no copy
 
   const target = input.target;
   const onLog = input.onLog ?? (async () => {});

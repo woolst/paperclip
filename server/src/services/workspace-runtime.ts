@@ -3353,6 +3353,7 @@ export async function realizeExecutionWorkspace(input: {
     };
   }
 
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (a git worktree is disabled)."); // fork: no copy
   const repoRoot = await resolveGitOwnerRepoRoot(input.base.baseCwd);
   let branchName: string;
   if (requestedExistingBranch) {
@@ -3807,6 +3808,7 @@ export async function ensurePersistedExecutionWorkspaceAvailable(input: {
     }
     return realized;
   }
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the reuse of a git worktree is disabled)."); // fork: no copy
   // Validate the base checkout before the git spawn. A missing or empty base
   // path makes the "git" spawn fail with a raw "spawn git ENOENT" error. That
   // error hides the real cause: the base project checkout is not on disk.
@@ -3926,6 +3928,7 @@ export async function ensurePersistedExecutionWorkspaceAvailable(input: {
     throw new Error(`Execution workspace "${cwd}" is missing and cannot be restored because no branch name is recorded.`);
   }
 
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the restore of a git worktree is disabled)."); // fork: no copy
   await fs.mkdir(path.dirname(worktreePath), { recursive: true });
   await runGit(["worktree", "prune"], repoRoot).catch(() => {});
   const restoreBaseRef = input.workspace.baseRef ?? input.base.repoRef ?? null;

@@ -3351,6 +3351,7 @@ export function heartbeatService(
         // preserving isolated mode and the mandatory sandbox preflight.
         ...(useIsolatedTaskDirectory ? { workspaceStrategy: { type: "project_primary" } } : {}),
       };
+      await (await import("../fork-no-copy.js")).forkNoCopyRun(db, { adapterType: agent.adapterType, config: mergedConfig, environmentDriver: selectedEnvironmentForConfig?.driver, workspaceMode: requestedExecutionWorkspaceMode, projectId: executionProjectId, reusedStrategy: requestedShouldReuseExisting ? reusableExistingExecutionWorkspace?.strategyType : null, companyId: agent.companyId });
       const configSnapshot = buildExecutionWorkspaceConfigSnapshot(
         mergedConfig,
         selectedEnvironmentId,

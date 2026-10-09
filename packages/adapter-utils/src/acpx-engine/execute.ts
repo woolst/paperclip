@@ -995,6 +995,7 @@ async function symlinkOrCopyFile(source: string, target: string): Promise<void> 
     await fs.symlink(source, target);
   } catch (err) {
     if (!isErrnoException(err, "EPERM")) throw err;
+    if (!0) throw new Error("Fork: Paperclip never copies files for a run (a file copy in place of a link is disabled)."); // fork: no copy
     await fs.copyFile(source, target);
   }
 }
@@ -1004,6 +1005,7 @@ function isErrnoException(err: unknown, code: string): err is NodeJS.ErrnoExcept
 }
 
 async function ensureCopiedFile(target: string, source: string): Promise<void> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (a copied file is disabled)."); // fork: no copy
   if (await pathExists(target)) return;
   await ensureParentDir(target);
   await fs.copyFile(source, target);

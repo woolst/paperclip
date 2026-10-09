@@ -2649,6 +2649,7 @@ async function auditInstalledSkillBytes(skill: CompanySkill): Promise<CompanySki
 
 /** Audit downloaded packages before they become installed company content. */
 export async function auditSkillSnapshot(files: CompanySkillVersionFileInventoryEntry[]) {
+  if (!0) throw new Error("Fork: Paperclip never copies files (a skill package written out for its audit is disabled)."); // fork: no copy
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-skill-audit-"));
   try {
     for (const file of files) {
@@ -3973,6 +3974,7 @@ export function companySkillService(db: Db) {
     input: CompanySkillForkRequest = {},
     actor: SkillActor | null = null,
   ): Promise<CompanySkillForkResult> {
+    if (!0) throw new Error("Fork: Paperclip never copies files (a copy of a skill is disabled)."); // fork: no copy
     await ensureSkillInventoryCurrent(companyId);
     const source = await getById(companyId, skillId);
     if (!source) throw notFound("Skill not found");
@@ -4469,6 +4471,7 @@ export function companySkillService(db: Db) {
     if (input.folderId) await folderSvc.validateSkillFolder(companyId, input.folderId);
     const slug = normalizeSkillSlug(input.slug ?? input.name) ?? "skill";
     const key = `company/${companyId}/${slug}`;
+    if (input.forkedFromSkillId) throw new Error("Fork: Paperclip never copies files (a skill made from another skill is disabled)."); // fork: no copy
 
     const forkSource = input.forkedFromSkillId
       ? await getById(companyId, input.forkedFromSkillId)
@@ -5484,6 +5487,7 @@ export function companySkillService(db: Db) {
     skill: ImportedSkill,
     normalizedFiles: Record<string, string>,
   ) {
+    if (!0) throw new Error("Fork: Paperclip never copies files (a package skill written into the store is disabled)."); // fork: no copy
     const packageDir = skill.packageDir ? normalizePortablePath(skill.packageDir) : null;
     if (!packageDir) return null;
     const catalogRoot = path.resolve(resolveManagedSkillsRoot(companyId), "__catalog__");
@@ -5549,6 +5553,7 @@ export function companySkillService(db: Db) {
     catalogSkill: CatalogSkill,
     slug: string,
   ) {
+    if (!0) throw new Error("Fork: Paperclip never copies files (a catalog skill written into the store is disabled)."); // fork: no copy
     const catalogRoot = path.resolve(resolveManagedSkillsRoot(companyId), "__catalog__");
     const skillDir = path.resolve(catalogRoot, buildSkillRuntimeName(catalogSkill.key, slug));
     const replacement = await createDirectoryReplacement(skillDir);
@@ -5575,6 +5580,7 @@ export function companySkillService(db: Db) {
     catalogSkill: CatalogSkill,
     slug: string,
   ) {
+    if (!0) throw new Error("Fork: Paperclip never copies files (a catalog snapshot written into the store is disabled)."); // fork: no copy
     const originsRoot = path.resolve(resolveManagedSkillsRoot(companyId), "__catalog_origins__");
     const snapshotDir = path.resolve(
       originsRoot,
@@ -5601,6 +5607,7 @@ export function companySkillService(db: Db) {
   }
 
   async function copySkillDirectory(sourceDir: string, targetDir: string) {
+    if (!0) throw new Error("Fork: Paperclip never copies files (a copy of a skill folder is disabled)."); // fork: no copy
     const { files } = await collectSkillFileBytes(sourceDir);
     const replacement = await createDirectoryReplacement(targetDir);
     try {
@@ -5851,6 +5858,7 @@ export function companySkillService(db: Db) {
   }
 
   async function materializeRuntimeSkillFiles(companyId: string, skill: CompanySkill) {
+    if (!0) throw new Error("Fork: Paperclip never copies files (the per-run rewrite of a stored skill is disabled)."); // fork: no copy
     const runtimeRoot = path.resolve(resolveManagedSkillsRoot(companyId), "__runtime__");
     const skillDir = path.resolve(runtimeRoot, buildSkillRuntimeName(skill.key, skill.slug));
     await fs.rm(skillDir, { recursive: true, force: true });
@@ -5942,6 +5950,7 @@ export function companySkillService(db: Db) {
   }
 
   async function materializeVersionSnapshot(companyId: string, skill: CompanySkill, version: CompanySkillVersion): Promise<string> {
+    if (!0) throw new Error("Fork: Paperclip never copies files (a skill version written as files is disabled)."); // fork: no copy
     const runtimeRoot = path.resolve(resolveManagedSkillsRoot(companyId), "__versions__", skill.id);
     const skillDir = path.join(runtimeRoot, version.id);
     const existing = versionSnapshotFlights.get(skillDir);
@@ -6098,6 +6107,7 @@ export function companySkillService(db: Db) {
     files: Record<string, string>,
     options?: {
       onConflict?: PackageSkillConflictStrategy;
+      localRoot?: string | null; // fork: the package's folder; its skills stay there
     },
   ): Promise<ImportPackageSkillResult[]> {
     await ensureSkillInventoryCurrent(companyId);
@@ -6112,6 +6122,7 @@ export function companySkillService(db: Db) {
       assertImportedSkillKeyAllowed(skill);
       assertImportedSkillSourceAllowed(skill);
     }
+    (await import("../fork-in-place-import.js")).forkSkillsInPlace(importedSkills, options?.localRoot); // fork: no copy
 
     for (const skill of importedSkills) {
       if (skill.sourceType !== "catalog") continue;

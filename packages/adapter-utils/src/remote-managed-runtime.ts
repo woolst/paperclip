@@ -122,6 +122,7 @@ export async function prepareRemoteManagedRuntime(input: {
   // child task wires it into the workspace/asset transfers.
   onProgress?: RuntimeProgressSink;
 }): Promise<PreparedRemoteManagedRuntime> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (prepareRemoteManagedRuntime is disabled)."); // fork: no copy
   const baseWorkspaceRemoteDir = input.workspaceRemoteDir ?? input.spec.remoteCwd;
   const syncWorkspace = input.syncWorkspace !== false;
   const workspaceRemoteDir = syncWorkspace

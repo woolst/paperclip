@@ -840,6 +840,7 @@ export async function prepareNativeWorkspaceSync(input: {
   if (input.target?.kind !== "remote" || input.target.transport !== "sandbox") {
     return null;
   }
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the native workspace seed is disabled)."); // fork: no copy
   const target = input.target;
   const providerLeaseId = providerLeaseIdFor({ target, lease: input.lease });
   // Reattachment may never seed a replacement sandbox over a still-live run.
@@ -1047,6 +1048,7 @@ export async function resumeNativeWorkspaceSync(input: {
   target: AdapterExecutionTarget;
   assertOwnership?: () => Promise<void>;
 }): Promise<boolean> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the native workspace sync back is disabled)."); // fork: no copy
   if (input.target.kind !== "remote" || input.target.transport !== "sandbox") {
     throw new Error("workspace_sync_out_unrecoverable");
   }

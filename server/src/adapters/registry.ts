@@ -967,6 +967,7 @@ const externalAdaptersReady: Promise<void> = (async () => {
   try {
     const externalAdapters = await buildExternalAdapters();
     for (const externalAdapter of externalAdapters) {
+      if (["claude_local", "process", "http"].includes(externalAdapter.type)) { console.log(`[paperclip] Fork: Paperclip never copies files, so no package replaces the "${externalAdapter.type}" adapter; skipped`); continue; } // fork: no copy
       const overriding = BUILTIN_ADAPTER_TYPES.has(externalAdapter.type);
       if (overriding) {
         console.log(
@@ -999,6 +1000,7 @@ export function waitForExternalAdapters(): Promise<void> {
 }
 
 export function registerServerAdapter(adapter: ServerAdapterModule): void {
+  if (["claude_local", "process", "http"].includes(adapter.type) && adaptersByType.has(adapter.type)) throw new Error(`Fork: Paperclip never copies files, so no package replaces the "${adapter.type}" adapter.`); // fork: no copy
   if (BUILTIN_ADAPTER_TYPES.has(adapter.type) && !builtinFallbacks.has(adapter.type)) {
     const existing = adaptersByType.get(adapter.type);
     if (existing) {

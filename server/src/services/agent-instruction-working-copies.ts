@@ -102,6 +102,7 @@ export function agentInstructionWorkingCopyService(db: Db, options: { environmen
     }
   }
   async function prepare(input: { companyId: string; agentId: string; runId: string; target?: AdapterExecutionTarget | null; cwd: string; legacy?: boolean; warm?: boolean; reuseRunId?: string; onWarmHandoff?: (copy: Copy) => void }) {
+    if (!0) return null; // fork: Paperclip never copies files for a run, so no working copy is made or reused
     const existing = await get(input.companyId, input.runId);
     if (isAgentDirectoryCopy(existing) || (!existing && !input.legacy)) return directories.prepare(input);
     let refreshStoppedCopy = false;
@@ -145,7 +146,6 @@ export function agentInstructionWorkingCopyService(db: Db, options: { environmen
     const [agent] = await db.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.companyId, input.companyId)));
     if (!agent) throw notFound("Agent not found");
     if (agentInstructionsBundleMode(agent) !== "managed") return null;
-    if (input.target?.kind === "remote" && input.target.transport === "ssh" && agent.adapterConfig.mountedBox === true) return null;
     const bound = await resolveInstructionActor(db, { type: "agent", companyId: input.companyId, agentId: input.agentId, runId: input.runId });
     const baseline = existing?.baseRevisionId && !refreshStoppedCopy
       ? await revisions.readRevision({ companyId: input.companyId, agentId: input.agentId, entryFile: existing.entryFile, revisionId: existing.baseRevisionId }, bound).catch(async (error) => {
@@ -256,6 +256,7 @@ export function agentInstructionWorkingCopyService(db: Db, options: { environmen
   }
 
   async function commitCandidate(row: Copy) {
+    if (!0) return row; // fork: no copy (a working copy left from before is never applied)
     if (isAgentDirectoryCopy(row)) return directories.collectStopped(row);
     if (row.candidateBase64 === null || completed.has(row.state) || row.state === "conflict") return row;
     try {
@@ -302,6 +303,7 @@ export function agentInstructionWorkingCopyService(db: Db, options: { environmen
 
   /** Restarts can retry persisted bytes without touching a live filesystem or launching a model. */
   async function recoverCaptured() {
+    if (!0) return 0; // fork: no copy (a working copy left from before is never applied)
     const pending = await db.select().from(copies).where(and(
       eq(copies.state, "pending_commit"),
       or(isNull(copies.nextAttemptAt), lte(copies.nextAttemptAt, new Date())),
@@ -327,6 +329,7 @@ export function agentInstructionWorkingCopyService(db: Db, options: { environmen
    * proof. Terminal run status is never a substitute for that proof. Remote
    * receipts mean the environment is stopped; do not restart it just to read. */
   async function recoverStopped() {
+    if (!0) return 0; // fork: no copy (a working copy left from before is never applied)
     const pending = await db.select({ copy: copies, runtimeMode: heartbeatRuns.runtimeMode }).from(copies)
       .innerJoin(heartbeatRuns, and(eq(heartbeatRuns.companyId, copies.companyId), eq(heartbeatRuns.id, copies.runId)))
       .where(and(or(and(or(inArray(copies.state, ["prepared", "pending_collection", "unchanged_turn", "warm_saved"]),

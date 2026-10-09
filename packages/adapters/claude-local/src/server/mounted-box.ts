@@ -6,10 +6,12 @@
 // - boxShareDir: the box folder of the read-only Paperclip share; absent: /opt/paperclip.
 // Mount table: {"mounts": [{"mac": "<absolute Mac folder>", "box": "<absolute box folder>",
 // "readOnly": true}]}; the longest matching Mac folder wins; readOnly is not read. A task with no
-// project runs in /data/agent-homes/<agent id>. Instructions and skills go once per bundle key to
-// <instance>/box-share/bundles/<companyId>/<bundleKey>/, in the box <boxShareDir>/bundles/.
+// project runs in /data/agent-homes/<agent id>. Nothing is copied: the instructions go inline, and each skill is a
+// link to its own folder as the box sees it, under <instance>/box-share/bundles/<companyId>/<key>/, in the box
+// <boxShareDir>/bundles/. A skill whose folder is in no box is left out and named in the run log.
 // A refused run ends before any process starts, with error code fork_run_refused.
 
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -161,29 +163,57 @@ export function boxSshCommandBytes(input: {
   return Buffer.byteLength(`sh -c ${shellQuote(remoteScript)}`, "utf8");
 }
 
-/** The Mac folder of a bundle in the share, under the instance root as the prompt cache finds it. */
-export function boxBundleMacDir(companyId: string, bundleKey: string, env: NodeJS.ProcessEnv = process.env): string {
+/** The Mac folder of the Paperclip share, under the instance root as the prompt cache finds it. */
+export function boxShareMacDir(env: NodeJS.ProcessEnv = process.env): string {
   const instanceRoot = resolvePaperclipInstanceRootForAdapter({
     homeDir: nonEmpty(env.PAPERCLIP_HOME), instanceId: nonEmpty(env.PAPERCLIP_INSTANCE_ID), env,
   });
-  return path.join(instanceRoot, "box-share", "bundles", companyId, bundleKey);
+  return path.join(instanceRoot, "box-share");
+}
+
+/** A skill of the prompt bundle: its name and the box folder its link points at, or null when no box has it. */
+export interface BoxSkillLink {
+  name: string;
+  macFolder: string;
+  boxFolder: string | null;
 }
 
 /**
- * Copies the prompt bundle, each link resolved to its files, into a folder beside the target,
- * edits one file when asked, then renames it into place. A target that exists stays. True when written.
+ * The skills of a prompt bundle (its .claude/skills links), each mapped to its folder in the box by its real path, so
+ * a skill folder that is itself a link to a folder in no box is left out, never linked to a path that cannot resolve.
  */
-export async function writeBoxBundle(
-  sourceDir: string, target: string, edit?: { file: string; from: string; to: string },
-): Promise<boolean> {
+export async function boxSkillLinks(sourceDir: string, rows: BoxMount[]): Promise<BoxSkillLink[]> {
+  const home = path.join(sourceDir, ".claude", "skills");
+  const names = (await fs.readdir(home).catch(() => [] as string[])).sort();
+  const realRows = await Promise.all(rows.map(async (row) => ({ ...row, mac: await fs.realpath(row.mac).catch(() => row.mac) })));
+  const links: BoxSkillLink[] = [];
+  for (const name of names) {
+    const entry = path.join(home, name);
+    const macFolder = path.resolve(home, await fs.readlink(entry).catch(() => name));
+    const real = await fs.realpath(entry).catch(() => null);
+    links.push({ name, macFolder, boxFolder: real ? mapToBox(realRows, real) : null });
+  }
+  return links;
+}
+
+/** The bundle's key in the share: the prompt bundle's key and the links it holds. */
+export function boxBundleKey(bundleKey: string, links: BoxSkillLink[]): string {
+  const list = links.filter((link) => link.boxFolder).map((link) => `${link.name}\t${link.boxFolder}`).join("\n");
+  return `${bundleKey}-${createHash("sha256").update(list).digest("hex").slice(0, 16)}`;
+}
+
+/**
+ * Writes the box bundle as links: .claude/skills/<name> points at the skill's box folder. Nothing is copied. The
+ * links are made in a folder beside the target, which is then renamed into place; a target that exists stays.
+ * True when written.
+ */
+export async function linkBoxBundle(links: BoxSkillLink[], target: string): Promise<boolean> {
   if (await exists(target)) return false;
   const temp = `${target}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.cp(sourceDir, temp, { recursive: true, dereference: true });
-    if (edit) {
-      const file = path.join(temp, edit.file);
-      await fs.writeFile(file, (await fs.readFile(file, "utf8")).split(edit.from).join(edit.to), "utf8");
+    await fs.mkdir(path.join(temp, ".claude", "skills"), { recursive: true });
+    for (const link of links) {
+      if (link.boxFolder) await fs.symlink(link.boxFolder, path.join(temp, ".claude", "skills", link.name));
     }
     await fs.rename(temp, target);
     return true;
@@ -193,6 +223,17 @@ export async function writeBoxBundle(
   } finally {
     await fs.rm(temp, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+/** The run prompt's line that names the instruction file, with the Mac paths turned into the box's. */
+export function boxInstructionsText(text: string, macFile: string, rows: BoxMount[]): string {
+  if (!text || !macFile) return text;
+  const boxFile = mapToBox(rows, macFile);
+  if (!boxFile) {
+    return `Agent instructions for this run are in the system prompt. Their folder on the Mac, ${path.dirname(macFile)}/, ` +
+      "is in no box, so sibling instruction files cannot be read in this run.";
+  }
+  return text.split(macFile).join(boxFile).split(`${path.dirname(macFile)}/`).join(`${path.posix.dirname(boxFile)}/`);
 }
 
 /** One SSH probe: makes the agent-home folder and checks the mapped folder; makes no mapped folder. */
@@ -232,33 +273,29 @@ export async function forkMountedBox(input: {
   const agentHome = path.posix.join(BOX_AGENT_HOMES, ctx.agent.id);
   const workspace = parseObject(ctx.context.paperclipWorkspace);
   const macFolder = path.resolve(input.cwd);
+  const shareDir = asString(config.boxShareDir, "").trim() || BOX_SHARE_DIR_DEFAULT;
+  const file = asString(config.boxMounts, "").trim() || defaultBoxMountsPath();
+  const table = await readBoxMounts(file);
+  if (!table) return refuse(onLog, BOX_REFUSALS.badTable(file));
+  const rows = [...table, { mac: boxShareMacDir(), box: path.posix.normalize(shareDir) }];
   let boxFolder = agentHome;
   if (asString(workspace.source, "") !== "agent_home") {
     const macHomes = [workspace.agentHome, workspace.agentHomeForPermissions].map((home) => asString(home, ""));
     if (macHomes.some((home) => home && path.resolve(home) === macFolder)) return refuse(onLog, BOX_REFUSALS.notMounted(macFolder));
-    const file = asString(config.boxMounts, "").trim() || defaultBoxMountsPath();
-    const rows = await readBoxMounts(file);
-    if (!rows) return refuse(onLog, BOX_REFUSALS.badTable(file));
-    const mapped = mapToBox(rows, macFolder);
+    const mapped = mapToBox(table, macFolder);
     if (!mapped) return refuse(onLog, BOX_REFUSALS.notMounted(macFolder));
     boxFolder = mapped;
   }
 
-  const shareDir = asString(config.boxShareDir, "").trim() || BOX_SHARE_DIR_DEFAULT;
   const apiUrl = asString(config.boxApiUrl, "").trim() || BOX_API_URL_DEFAULT;
-  const boxBundle = path.posix.join(shareDir, "bundles", ctx.agent.companyId, promptBundle.bundleKey);
-  const macBundle = boxBundleMacDir(ctx.agent.companyId, promptBundle.bundleKey);
+  const links = await boxSkillLinks(promptBundle.rootDir, rows);
+  const key = boxBundleKey(promptBundle.bundleKey, links);
+  const boxBundle = path.posix.join(shareDir, "bundles", ctx.agent.companyId, key);
+  const macBundle = path.join(boxShareMacDir(), "bundles", ctx.agent.companyId, key);
   const mcpText = boxMcpText(input.servers);
   const effort = forkEffortRule(input.effort, input.model).effort;
-  const instructions = promptBundle.instructionsFilePath
-    ? ["--append-system-prompt-file", path.posix.join(boxBundle, path.basename(promptBundle.instructionsFilePath))]
-    : [];
+  const instructions = promptBundle.instructionsText ? ["--append-system-prompt", promptBundle.instructionsText] : [];
   const macInstructions = asString(config.instructionsFilePath, "").trim();
-  const edit = promptBundle.instructionsFilePath && macInstructions ? {
-    file: path.basename(promptBundle.instructionsFilePath),
-    from: `loaded from ${macInstructions}. Resolve any relative file references from ${path.dirname(macInstructions)}/. `,
-    to: `loaded from ${instructions[1]}. Resolve any relative file references from ${boxBundle}/. `,
-  } : undefined;
   const args = [
     "--print", "--output-format", "stream-json", "--verbose",
     ...(input.model ? ["--model", input.model] : []),
@@ -274,9 +311,12 @@ export async function forkMountedBox(input: {
 
   if (!(await probeBox(spec, agentHome, boxFolder))) return refuse(onLog, BOX_REFUSALS.notInBox(boxFolder));
   try {
-    await writeBoxBundle(promptBundle.rootDir, macBundle, edit);
+    await linkBoxBundle(links, macBundle);
   } catch {
     return refuse(onLog, BOX_REFUSALS.noShare(macBundle));
+  }
+  for (const link of links.filter((entry) => !entry.boxFolder)) {
+    await onLog("stderr", `[paperclip] Warning: skill "${link.name}" is left out of this box run: its folder ${link.macFolder} is in no box.\n`);
   }
 
   const settings = JSON.parse(forkSettingsText(config, input.model)) as Record<string, boolean>;
@@ -294,7 +334,7 @@ export async function forkMountedBox(input: {
       restoreWorkspace: async () => undefined,
     },
     agentHome, apiUrl, mcpText,
-    mapText: (text: string) => (edit ? text.split(edit.from).join(edit.to) : text),
+    mapText: (text: string) => boxInstructionsText(text, macInstructions, rows),
     applyEnv(env: Record<string, string>, loggedEnv: Record<string, string>) {
       for (const record of [env, loggedEnv]) Object.assign(record, { AGENT_HOME: agentHome, PAPERCLIP_API_URL: apiUrl });
     },

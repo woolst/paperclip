@@ -74,6 +74,7 @@ function classifyApiKeyBinding(value: unknown): ApiKeyBinding {
 export async function reconcileCodexLocalManagedHomesOnStartup(
   db: Db,
 ): Promise<CodexAuthReconciliationSummary> {
+  if (!0) return { scanned: 0, seeded: 0, alreadySeeded: 0, externalOverride: 0, noManagedHome: 0, sourceAuthMissing: 0, failed: 0, seededAgentIds: [] }; // fork: no copy (no managed Codex home is seeded)
   const summary: CodexAuthReconciliationSummary = {
     scanned: 0,
     seeded: 0,

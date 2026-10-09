@@ -21,11 +21,11 @@ import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 3100
-KEYS = ("upstream", "commits", "sshCopyCalls", "sshCopyCallers", "issueWorkspaceChecks")
+KEYS = ("upstream", "commits", "sshCopyCalls", "sshCopyCallers", "copyCalls", "copyCallers", "issueWorkspaceChecks")
 LOCKS = ("pnpm-lock.yaml", "pnpm-workspace.yaml", "package.json")
 ISSUES = "server/src/routes/issues.ts"
 ISSUE_CALL = "collectIssueWorkspaceCommandPaths("
-SOURCES = ["%s/*.%s" % (d, e) for d in ("server", "packages") for e in ("ts", "tsx", "js", "mjs", "cjs")]
+SOURCES = ["%s/*.%s" % (d, e) for d in ("server", "packages", "cli", "skills") for e in ("ts", "tsx", "js", "mjs", "cjs", "sh")]
 IDENT = ["-c", "user.name=rebase-guard", "-c", "user.email=rebase-guard@localhost",
          "-c", "commit.gpgsign=false", "-c", "rebase.updateRefs=false"]
 VALUED = {"-r", "--require", "--import", "--loader", "--experimental-loader", "--env-file", "-e", "--eval",
@@ -226,10 +226,20 @@ def callers(cwd, hooks, rev=None):
     rc, out, err = git(args + ([rev] if rev else []) + ["--"] + SOURCES, cwd)
     if rc > 1: raise Stop(4, "cannot search for the SSH copy calls: %s" % _last(err))
     return sorted(f for f in (l.split(":", 1)[1] if rev else l for l in out.splitlines()) if not is_test(f))
+def copy_callers(cwd, hooks, rev=None):
+    """The source files that hold a file copy command (copyCalls, as written), tests left out."""
+    args = ["grep", "-l", "-F"] + [a for n in hooks["copyCalls"] for a in ("-e", n)]
+    rc, out, err = git(args + ([rev] if rev else []) + ["--"] + SOURCES, cwd)
+    if rc > 1: raise Stop(4, "cannot search for the file copy calls: %s" % _last(err))
+    return sorted(f for f in (l.split(":", 1)[1] if rev else l for l in out.splitlines()) if not is_test(f))
 def tripwires(wt, hooks):
     for path in callers(wt, hooks):
         if path not in hooks["sshCopyCallers"]:
             raise Stop(3, "tripwire: %s holds an SSH copy call off the reviewed list" % path, path)
+    # Paperclip never copies files: a file upstream gives a copy command is reviewed before the fork takes it.
+    for path in copy_callers(wt, hooks):
+        if path not in hooks["copyCallers"]:
+            raise Stop(3, "tripwire: %s holds a file copy call off the reviewed list" % path, path)
     try:
         with open(os.path.join(wt, ISSUES), encoding="utf-8") as f:
             count = f.read().count(ISSUE_CALL)

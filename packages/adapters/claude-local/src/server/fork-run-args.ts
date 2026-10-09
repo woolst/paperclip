@@ -159,3 +159,21 @@ export async function forkRunEffort(effort: string, model: string, onLog: RunLog
   if (rule.log) await onLog("stderr", rule.log);
   return rule.effort;
 }
+
+/**
+ * The command line as the run log keeps it (fork: no copy). The agent's instructions go to Claude inline, so the
+ * argument after --append-system-prompt is the whole text; the log keeps its size in its place, never the text.
+ */
+export function forkLoggedArgs(args: string[]): string[] {
+  return args.map((arg, i) => (i > 0 && args[i - 1] === "--append-system-prompt"
+    ? `[agent instructions: ${arg.length} characters, read in place, not logged]` : arg));
+}
+
+/**
+ * An instruction file's text without a leading YAML front matter block (fork: in-place instructions). A package's
+ * AGENTS.md opens with its name, title, reporting line and skills, which the import read; the run takes the body.
+ */
+export function forkInstructionsBody(text: string): string {
+  const match = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+  return match ? text.slice(match[0].length).replace(/^(?:\r?\n)+/, "") : text;
+}

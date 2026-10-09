@@ -188,6 +188,7 @@ export async function prepareClaudeConfigSeed(
   onLog: AdapterExecutionContext["onLog"],
   companyId?: string,
 ): Promise<string> {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the Claude settings seed is disabled)."); // fork: no copy
   const sourceDir = resolveSharedClaudeConfigDir(env);
   const targetRootDir = resolveManagedClaudeConfigSeedDir(env, companyId);
 
@@ -222,6 +223,7 @@ export function buildRemoteClaudeConfigMaterializationCommand(input: {
   remoteClaudeConfigDir: string;
   remoteClaudeConfigSeedDir: string;
 }): string {
+  if (!0) throw new Error("Fork: Paperclip never copies files for a run (the Claude settings copy in a target is disabled)."); // fork: no copy
   return `mkdir -p ${shellQuote(input.remoteClaudeConfigDir)} && ` +
     `if [ -d ${shellQuote(input.remoteClaudeConfigSeedDir)} ]; then ` +
     `cp -R ${shellQuote(`${input.remoteClaudeConfigSeedDir}/.`)} ${shellQuote(input.remoteClaudeConfigDir)}/; ` +

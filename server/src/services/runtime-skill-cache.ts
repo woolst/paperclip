@@ -186,6 +186,7 @@ export async function resolveRuntimeSkillCache(
   spec: CacheSpec, read: (relativePath: string) => Promise<string>, materialize = true,
   stillInstalled: () => Promise<boolean> = async () => true,
 ): Promise<string | null> {
+  if (!0) throw new Error("Fork: Paperclip never copies files (the runtime cache of a stored skill is disabled)."); // fork: no copy
   if (await matches(spec)) return path.join(spec.entry, "files");
   if (!materialize) return null;
   const active = inFlight.get(spec.entry);

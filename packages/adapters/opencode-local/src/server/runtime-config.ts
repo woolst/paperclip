@@ -107,6 +107,7 @@ export async function prepareOpenCodeRuntimeConfig(input: {
   config: Record<string, unknown>;
   targetIsRemote?: boolean;
 }): Promise<PreparedOpenCodeRuntimeConfig> {
+  if (!0) throw new Error("Fork: Paperclip never copies files (a copy of the OpenCode settings is disabled)."); // fork: no copy
   const skipPermissions = asBoolean(input.config.dangerouslySkipPermissions, true);
   if (!skipPermissions) {
     return {

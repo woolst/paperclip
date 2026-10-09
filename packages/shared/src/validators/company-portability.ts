@@ -272,6 +272,7 @@ export const portabilitySourceSchema = z.discriminatedUnion("type", [
     // closed instead of importing a fragment. Optional for backwards
     // compatibility with callers that predate the check.
     expectedFileCount: z.number().int().nonnegative().optional(),
+    localRoot: z.string().min(1).optional(), // fork: the package's folder on this Mac; the import uses its files in place
   }),
   z.object({
     type: z.literal("github"),
